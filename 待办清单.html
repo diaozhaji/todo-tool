@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>制卡技术待办清单</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; padding: 20px; min-height: 100vh; }
+.container { max-width: 860px; margin: 0 auto; }
+h1 { font-size: 24px; text-align: center; margin-bottom: 8px; color: #1a1a1a; }
+.meta { text-align: center; color: #888; font-size: 13px; margin-bottom: 20px; }
+.stats { display: flex; justify-content: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.stat { background: #fff; border-radius: 8px; padding: 10px 20px; font-size: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.stat b { color: #2B579A; font-size: 20px; }
+.stat.done b { color: #2E7D32; }
+.stat.late b { color: #c62828; }
+
+.toolbar { display: flex; justify-content: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.toolbar button { background: #2B579A; color: #fff; border: none; padding: 8px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: background 0.15s; }
+.toolbar button:hover { background: #1e3f6e; }
+.toolbar button.secondary { background: #fff; color: #666; border: 1px solid #ddd; }
+.toolbar button.secondary:hover { border-color: #999; color: #333; }
+.toolbar button.secondary.active { background: #2B579A; color: #fff; border-color: #2B579A; }
+.toolbar button.danger { background: #fff; color: #c62828; border: 1px solid #e0e0e0; }
+.toolbar button.danger:hover { background: #c62828; color: #fff; border-color: #c62828; }
+
+.list { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow: hidden; }
+.item { display: flex; align-items: flex-start; padding: 12px 16px; border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
+.item:last-child { border-bottom: none; }
+.item:hover { background: #f8faff; }
+.item.checked { background: #f6fbf6; }
+
+.checkbox { width: 22px; height: 22px; border: 2px solid #ccc; border-radius: 5px; display: flex; align-items: center; justify-content: center; margin-right: 10px; margin-top: 3px; transition: all 0.15s; flex-shrink: 0; cursor: pointer; }
+.checkbox svg { width: 14px; height: 14px; opacity: 0; transition: opacity 0.15s; }
+.item.checked .checkbox { border-color: #2E7D32; background: #2E7D32; }
+.item.checked .checkbox svg { opacity: 1; }
+
+.no { width: 28px; font-size: 13px; color: #999; font-weight: 600; flex-shrink: 0; text-align: right; margin-right: 10px; margin-top: 3px; }
+.body { flex: 1; min-width: 0; }
+.line1 { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 0; }
+.content { font-size: 15px; line-height: 1.5; word-break: break-all; }
+.item.checked .content { text-decoration: line-through; color: #999; }
+.note { font-size: 12px; color: #888; margin-left: 6px; }
+.note.check { color: #2E7D32; font-weight: 600; }
+.note.cross { color: #c62828; }
+
+.metaRow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.badge { font-size: 12px; line-height: 18px; padding: 1px 8px; border-radius: 10px; background: #eef2f8; color: #556070; display: inline-flex; align-items: center; gap: 4px; border: 1px solid transparent; }
+.badge.owner { background: #e8f0fe; color: #2B579A; }
+.badge.deadline { background: #f1f3f5; color: #555; }
+.badge.deadline.today { background: #fff4e0; color: #b26a00; font-weight: 600; }
+.badge.deadline.soon { background: #e9f7ef; color: #1b7a3d; }
+.badge.deadline.overdue { background: #fce8e6; color: #c62828; font-weight: 600; }
+.badge.deadline.unparsed { background: #fff; color: #888; border: 1px dashed #d0d0d0; }
+.item.checked .badge { opacity: .55; }
+
+.actions { display: flex; gap: 4px; margin-left: 8px; flex-shrink: 0; opacity: 0; transition: opacity 0.15s; }
+.item:hover .actions { opacity: 1; }
+.act-btn { width: 28px; height: 28px; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: background 0.15s; }
+.act-btn.edit { background: #e8f0fe; color: #2B579A; }
+.act-btn.edit:hover { background: #2B579A; color: #fff; }
+.act-btn.del { background: #fce8e6; color: #c62828; }
+.act-btn.del:hover { background: #c62828; color: #fff; }
+
+/* Modal */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.3); z-index: 100; align-items: center; justify-content: center; }
+.modal-overlay.show { display: flex; }
+.modal { background: #fff; border-radius: 12px; padding: 24px; width: 90%; max-width: 480px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+.modal h3 { font-size: 18px; margin-bottom: 16px; color: #1a1a1a; }
+.modal label { display: block; font-size: 13px; color: #888; margin-bottom: 4px; margin-top: 12px; }
+.modal input, .modal textarea { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; font-size: 14px; outline: none; transition: border-color 0.15s; font-family: inherit; background: #fff; }
+.modal input:focus, .modal textarea:focus { border-color: #2B579A; }
+.modal textarea { resize: vertical; min-height: 60px; }
+.modal .row2 { display: flex; gap: 12px; }
+.modal .row2 > div { flex: 1; min-width: 0; }
+.modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.modal-btns button { padding: 8px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; border: 1px solid #ddd; background: #fff; color: #666; transition: all 0.15s; }
+.modal-btns button:hover { border-color: #999; }
+.modal-btns button.primary { background: #2B579A; color: #fff; border-color: #2B579A; }
+.modal-btns button.primary:hover { background: #1e3f6e; }
+
+/* 日期输入行 + 日历按钮 */
+.dl-wrap { position: relative; }
+.dl-wrap input { padding-right: 38px; }
+.pick-btn { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; border: none; background: #f1f3f5; border-radius: 6px; cursor: pointer; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.pick-btn:hover { background: #e8f0fe; }
+.pick-btn.on { background: #2B579A; color: #fff; }
+.dl-preview { font-size: 12px; margin-top: 5px; min-height: 16px; color: #888; line-height: 1.4; }
+.dl-preview.ok { color: #1b7a3d; }
+.dl-preview.ok.today { color: #b26a00; }
+.dl-preview.ok.overdue { color: #c62828; }
+.dl-preview.warn { color: #b26a00; }
+.clear-btn { font-size: 12px; color: #c62828; background: none; border: none; cursor: pointer; padding: 0; margin-top: 4px; text-decoration: underline; }
+/* 自建日历面板 */
+.cal-pop { position: fixed; z-index: 300; display: none; width: 268px; background: #fff; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.22); padding: 10px; font-size: 13px; }
+.cal-pop.show { display: block; }
+.cal-head { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.cal-title { flex: 1; text-align: center; font-weight: 600; font-size: 14px; color: #1a1a1a; }
+.cal-nav { width: 26px; height: 26px; border: none; background: #f1f3f5; border-radius: 6px; cursor: pointer; font-size: 14px; color: #555; }
+.cal-nav:hover { background: #e8f0fe; color: #2B579A; }
+.cal-quick { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.cal-quick button { border: 1px solid #e3e8ef; background: #fff; color: #556070; border-radius: 12px; padding: 3px 8px; font-size: 12px; cursor: pointer; }
+.cal-quick button:hover { border-color: #2B579A; color: #2B579A; }
+.cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-week span { text-align: center; font-size: 11px; color: #999; padding: 2px 0; }
+.cal-day { text-align: center; padding: 5px 0; border-radius: 6px; cursor: pointer; color: #333; border: 1px solid transparent; }
+.cal-day:hover { background: #eef2f8; }
+.cal-day.empty { cursor: default; }
+.cal-day.empty:hover { background: none; }
+.cal-day.weekend { color: #a06a6a; }
+.cal-day.today { border-color: #2B579A; color: #2B579A; font-weight: 600; }
+.cal-day.sel { background: #2B579A; color: #fff !important; font-weight: 600; }
+.cal-foot { display: flex; gap: 6px; margin-top: 8px; }
+.cal-foot button { flex: 1; border: 1px solid #e3e8ef; background: #fff; color: #666; border-radius: 6px; padding: 5px 0; font-size: 12px; cursor: pointer; }
+.cal-foot button:hover { border-color: #999; color: #333; }
+.cal-foot .cal-clear { color: #c62828; }
+
+.empty { padding: 36px 16px; text-align: center; color: #aaa; font-size: 14px; }
+
+.footer { text-align: center; margin-top: 12px; color: #aaa; font-size: 12px; }
+.save-indicator { color: #2E7D32; font-weight: 600; opacity: 0; transition: opacity 0.3s; }
+.save-indicator.show { opacity: 1; }
+
+/* Add form at bottom */
+.add-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; align-items: center; }
+.add-row input { border: 2px dashed #ccc; border-radius: 8px; padding: 10px 12px; font-size: 14px; outline: none; transition: border-color 0.15s; font-family: inherit; background: #fff; }
+.add-row input:focus { border-color: #2B579A; border-style: solid; }
+.add-row .add-text { flex: 1 1 220px; min-width: 0; }
+.add-row .add-owner { flex: 0 1 120px; }
+.add-row .add-deadline-wrap { flex: 0 1 180px; position: relative; display: flex; align-items: center; min-width: 0; }
+.add-row .add-deadline-wrap input { flex: 1; width: 100%; min-width: 0; padding-right: 36px; }
+.add-row button.add-btn { background: #2E7D32; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-size: 14px; cursor: pointer; white-space: nowrap; transition: background 0.15s; }
+.add-row button.add-btn:hover { background: #1b5e20; }
+.add-hint { flex: 1 1 100%; font-size: 12px; color: #999; margin-top: -2px; min-height: 16px; }
+
+@media (max-width: 620px) {
+  .actions { opacity: 1; }
+  .add-row .add-owner { flex: 1 1 100%; }
+  .add-row .add-deadline-wrap { flex: 1 1 100%; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>制卡技术待办清单</h1>
+<p class="meta" id="metaLine"></p>
+<div class="stats">
+  <div class="stat">共 <b id="total">0</b> 项</div>
+  <div class="stat done">已完成 <b id="done">0</b> 项</div>
+  <div class="stat late">已逾期 <b id="late">0</b> 项</div>
+</div>
+<div class="toolbar">
+  <button class="secondary" id="sortBtn" onclick="toggleSort()">按截止日期排序</button>
+  <button class="secondary" onclick="resetChecks()">重置勾选</button>
+  <button class="secondary" onclick="exportData()">导出数据</button>
+  <button class="danger" onclick="clearAll()">清空重建</button>
+</div>
+<div class="list" id="list"></div>
+<div class="add-row">
+  <input id="addInput" class="add-text" placeholder="输入新待办项..." onkeydown="if(event.key==='Enter')addItem()">
+  <input id="addOwner" class="add-owner" placeholder="负责人" onkeydown="if(event.key==='Enter')addItem()">
+  <div class="add-deadline-wrap">
+    <input id="addDeadline" class="add-date" placeholder="截止日期（可点 📅）" autocomplete="off"
+           oninput="previewDeadline('add')" onkeydown="if(event.key==='Enter')addItem()">
+    <button class="pick-btn" id="addPick" type="button" title="从日历选择" onclick="openPicker('add')">📅</button>
+  </div>
+  <button class="add-btn" onclick="addItem()">添加</button>
+  <div class="add-hint" id="addPreview">截止日期支持：10-20 / 2026-10-20 / 10月20日 / 明天 / 下周三</div>
+</div>
+<div class="footer">
+  <span class="save-indicator" id="saveHint">已保存</span>
+  <span>所有操作自动保存到浏览器本地 · 下方示例项可直接删除</span>
+</div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+<div class="modal">
+  <h3>编辑待办项</h3>
+  <label>内容</label>
+  <textarea id="editText" rows="2"></textarea>
+  <div class="row2">
+    <div>
+      <label>负责人</label>
+      <input id="editOwner" placeholder="可选" autocomplete="off">
+    </div>
+    <div>
+      <label>截止日期</label>
+      <div class="dl-wrap">
+        <input id="editDeadline" placeholder="如 10-20 / 下周三" autocomplete="off" oninput="previewDeadline('edit')">
+        <button class="pick-btn" id="editPick" type="button" title="从日历选择" onclick="openPicker('edit')">📅</button>
+      </div>
+      <button class="clear-btn" onclick="clearDeadline()">清除日期</button>
+    </div>
+  </div>
+  <div class="dl-preview" id="editPreview"></div>
+  <label>备注</label>
+  <input id="editNote" placeholder="可选" autocomplete="off">
+  <div class="modal-btns">
+    <button onclick="closeEdit()">取消</button>
+    <button class="primary" onclick="saveEdit()">保存</button>
+  </div>
+</div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay" id="delModal">
+<div class="modal">
+  <h3>确认删除</h3>
+  <p id="delText" style="font-size:15px;color:#555;margin:12px 0;"></p>
+  <div class="modal-btns">
+    <button onclick="closeDel()">取消</button>
+    <button class="primary" style="background:#c62828;border-color:#c62828;" onclick="confirmDel()">删除</button>
+  </div>
+</div>
+</div>
+
+<script>
+const STORAGE_KEY = "zhika_todo_data_v2";
+const LEGACY_KEYS = ["zhika_todo_data"]; // 旧版本存档（含内置 demo 数据），首次加载时清除
+
+const DEFAULT_ITEMS = [
+  {id:1,text:"示例：整理制卡接口文档，同步给后端确认字段",note:"",owner:"张三",deadline:isoFromDay(2),deadlineText:""},
+];
+let items, checked, sortByDeadline = false;
+let editIdx = -1, delIdx = -1;
+
+function loadData() {
+  // 一次性清除旧版本存档（里面的内置 demo 数据不再加载）
+  LEGACY_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try {
+      const d = JSON.parse(saved);
+      items = (d.items || DEFAULT_ITEMS).map(i => ({ ...i }));
+      checked = d.checked || {};
+      sortByDeadline = !!d.sortByDeadline;
+    } catch(e) {
+      items = DEFAULT_ITEMS.map(i => ({ ...i }));
+      checked = {};
+    }
+  } else {
+    items = DEFAULT_ITEMS.map(i => ({ ...i }));
+    checked = {};
+  }
+  // 兼容旧数据：补齐 / 归一化字段
+  items.forEach(i => {
+    if (typeof i.owner !== "string") i.owner = "";
+    if (typeof i.deadlineText !== "string") i.deadlineText = "";
+    if (typeof i.deadline !== "string") i.deadline = "";
+    // 旧版本可能把无法识别的文字存进了 deadline，这里保留为 deadlineText
+    if (i.deadline && !isISO(i.deadline)) {
+      if (!i.deadlineText) i.deadlineText = i.deadline;
+      i.deadline = "";
+    }
+    // deadlineText 若能解析则升级为标准日期
+    if (!i.deadline && i.deadlineText) {
+      const up = parseDeadline(i.deadlineText);
+      if (up) { i.deadline = up; i.deadlineText = ""; }
+    }
+  });
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ items, checked, sortByDeadline }));
+  const hint = document.getElementById("saveHint");
+  hint.classList.add("show");
+  setTimeout(() => hint.classList.remove("show"), 1500);
+}
+
+function noteClass(note) {
+  if (!note) return "";
+  if (note.includes("✓")) return "check";
+  if (note.includes("×")) return "cross";
+  return "";
+}
+
+/* ---------------- 日期处理 ---------------- */
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+function isISO(s) {
+  if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(s + "T00:00:00");
+  return !isNaN(d.getTime());
+}
+// 兼容旧的 yyyy-m-d 之类
+function isValidDate(s) { return !!parseDeadline(s); }
+
+function makeISO(y, m, d) {
+  if (!(y >= 1900 && y <= 2999) || !(m >= 1 && m <= 12) || !(d >= 1 && d <= 31)) return null;
+  const dt = new Date(y, m - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() + 1 !== m || dt.getDate() !== d) return null; // 2月30日等
+  return y + "-" + pad2(m) + "-" + pad2(d);
+}
+
+function today0() { const t = new Date(); t.setHours(0, 0, 0, 0); return t; }
+function isoFromDay(dayOffset) {
+  const t = today0(); t.setDate(t.getDate() + dayOffset);
+  return t.getFullYear() + "-" + pad2(t.getMonth() + 1) + "-" + pad2(t.getDate());
+}
+function addMonths(months) {
+  const t = today0();
+  const total = t.getFullYear() * 12 + t.getMonth() + months;
+  const y = Math.floor(total / 12), mo = total % 12;
+  const d = new Date(y, mo + 1, 0);            // 目标月最后一天
+  d.setDate(Math.min(t.getDate(), d.getDate())); // 今天几号就几号，月末不越界
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+}
+function shiftISO(iso, days) {
+  const d = new Date(iso + "T00:00:00"); d.setDate(d.getDate() + days);
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+}
+
+const WEEK_MAP = { "一":1, "二":2, "三":3, "四":4, "五":5, "六":6, "日":0, "天":0, "1":1, "2":2, "3":3, "4":4, "5":5, "6":6, "7":0 };
+const REL_MAP = { "今天":0, "明天":1, "后天":2, "大后天":3, "昨天":-1 };
+
+/**
+ * 宽松解析：接受多种写法，返回 "YYYY-MM-DD"；识别不了返回 null
+ * 支持：2026-10-20 / 2026/10/20 / 2026.10.20 / 2026年10月20日
+ *       10-20 / 10/20 / 10.20 / 10月20日（无年份→本年，已过则视为明年）
+ *       20261020 / 261020
+ *       今天 明天 后天 大后天 昨天 明天晚上? （仅精确匹配）
+ *       3天后 / 5天前 / 2周后 / 1个月后
+ *       周五 / 星期五 / 下周三 / 礼拜六
+ *       月底 / 本月月底 / 下月底
+ *       ISO 周外：+3d +2w -5d
+ */
+function parseDeadline(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+
+  // 相对天数偏移：+3d / +2w / -5天
+  const off = s.match(/^([+-])\s*(\d+)\s*(d|w|天|周|个?星期|days?)?$/i);
+  if (off) {
+    const sign = off[1] === "-" ? -1 : 1;
+    const unit = (off[3] || "d").toLowerCase();
+    const n = sign * (+off[2]) * (/^(w|周|个?星期|week)/.test(unit) ? 7 : 1);
+    return isoFromDay(n);
+  }
+
+  // 带年份
+  let m = s.match(/^(\d{4})\s*[-\/.年月]\s*(\d{1,2})\s*[-\/.月]\s*(\d{1,2})\s*日?$/);
+  if (m) return makeISO(+m[1], +m[2], +m[3]);
+
+  // 纯数字 8 位 / 6 位
+  if (/^\d{8}$/.test(s)) return makeISO(+s.slice(0,4), +s.slice(4,6), +s.slice(6,8));
+  if (/^\d{6}$/.test(s)) return makeISO(2000 + (+s.slice(0,2)), +s.slice(2,4), +s.slice(4,6));
+
+  // 月底
+  const me = s.match(/^(?:本月|这个月|本|下(?:个月|周)?|下个)?月[底末]$/);
+  if (me) {
+    const t = today0();
+    const add = /下/.test(s) ? 1 : 0;
+    const y = t.getFullYear(), mo = t.getMonth() + add;
+    const last = new Date(y, mo + 1, 0);
+    return makeISO(last.getFullYear(), last.getMonth() + 1, last.getDate());
+  }
+
+  // 中文相对量：3天后 / 5天前 / 2周后 / 1个月后（"后"为未来，"前"为过去）
+  const rl = s.match(/^(\d{1,3})\s*(天|日|周|星期|礼拜|个?月)\s*(之?后|以?后|之?前|以?前)$/);
+  if (rl) {
+    const n = +rl[1], sign = /后/.test(rl[3]) ? 1 : -1;
+    if (/^(天|日)$/.test(rl[2])) return isoFromDay(sign * n);
+    if (/^(周|星期|礼拜)$/.test(rl[2])) return isoFromDay(sign * n * 7);
+    return addMonths(sign * n); // 按月进位，自动处理跨年和月末
+  }
+
+  // 语义日期
+  if (REL_MAP[s] !== undefined) return isoFromDay(REL_MAP[s]);
+  const nextRel = s.match(/^下(?:个)?(周|星期|礼拜)([一二三四五六日天1-7])$/);
+  if (nextRel) {
+    const target = WEEK_MAP[nextRel[2]];
+    const cur = today0().getDay();
+    return isoFromDay((7 - cur + target) + 7);
+  }
+  const thisRel = s.match(/^(?:这|本)?(周|星期|礼拜)([一二三四五六日天1-7])$/);
+  if (thisRel) {
+    const target = WEEK_MAP[thisRel[2]];
+    const cur = today0().getDay();
+    const diff = target - cur;
+    return isoFromDay(diff >= 0 ? diff : diff + 7);
+  }
+
+  // 无年份（本年，若已过 60 天以上则视为明年）
+  m = s.match(/^(\d{1,2})\s*[-\/.月]\s*(\d{1,2})\s*日?$/);
+  if (m) {
+    const mm = +m[1], dd = +m[2];
+    const y = today0().getFullYear();
+    let iso = makeISO(y, mm, dd);
+    if (!iso) return null;
+    const dt = new Date(iso + "T00:00:00");
+    if ((dt - today0()) / 86400000 < -60) iso = makeISO(y + 1, mm, dd);
+    return iso;
+  }
+  return null;
+}
+
+/** 取条目的 ISO：优先 deadline，其次解析文字（兼容旧数据） */
+function resolveISO(item) {
+  if (item.deadline && isISO(item.deadline)) return item.deadline;
+  const cand = item.deadline || item.deadlineText || "";
+  if (!cand) return null;
+  return parseDeadline(cand);
+}
+
+/** 写入条目日期：能识别→存 ISO；识别不了→按原文存 deadlineText，绝不丢弃 */
+function applyDeadline(item, raw) {
+  const text = String(raw || "").trim();
+  const iso = parseDeadline(text);
+  item.deadline = iso || "";
+  item.deadlineText = iso ? "" : text;
+}
+
+// { diff, cls, label, raw } 或 null
+function deadlineInfo(iso) {
+  if (!iso || !isISO(iso)) return null;
+  const dt = new Date(iso + "T00:00:00");
+  const diff = Math.round((dt - today0()) / 86400000);
+  let cls = "", tip = "";
+  if (diff < 0) { cls = "overdue"; tip = "已逾期 " + (-diff) + " 天"; }
+  else if (diff === 0) { cls = "today"; tip = "今天到期"; }
+  else if (diff === 1) { cls = "soon"; tip = "明天到期"; }
+  else if (diff <= 3) { cls = "soon"; tip = "还剩 " + diff + " 天"; }
+  const y = dt.getFullYear(), mo = dt.getMonth() + 1, d = dt.getDate();
+  const label = (y === today0().getFullYear() ? mo + "/" + d : y + "/" + mo + "/" + d);
+  return { diff, cls, label: label + (tip ? " · " + tip : ""), raw: iso };
+}
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/* ---------------- 输入实时预览 ---------------- */
+function previewDeadline(which) {
+  const box = document.getElementById(which + "Preview");
+  if (!box) return;
+  const raw = (document.getElementById(which + "Deadline").value || "").trim();
+  const DEFAULT_HINT = "截止日期支持：10-20 / 2026-10-20 / 明天 / 下周三，或点 📅 直接选日期";
+  // add 区的提示独占一行，需保留 add-hint 以免宽度被 flex 挤窄
+  const base = which === "add" ? "add-hint dl-preview" : "dl-preview";
+  if (!raw) { box.textContent = which === "add" ? DEFAULT_HINT : ""; box.className = base; return; }
+  const iso = parseDeadline(raw);
+  if (iso) {
+    const dl = deadlineInfo(iso);
+    box.textContent = "✓ 识别为 " + iso + "（" + dl.label + "）";
+    box.className = base + " ok " + dl.cls;
+  } else {
+    box.textContent = "⚠ 无法识别为日期，将按文字原样显示：" + raw;
+    box.className = base + " warn";
+  }
+}
+
+/* ---------------- 自建日历弹层（不依赖浏览器原生控件，Safari / 微信内置浏览器同样可用） ---------------- */
+const CAL = { which: null, y: 0, m: 0, sel: "", open: false };
+const CAL_QUICK = ["今天", "明天", "后天", "本周五", "下周三", "月底"];
+const WD = ["一", "二", "三", "四", "五", "六", "日"];
+
+function calEl() {
+  let p = document.getElementById("calPop");
+  if (!p) {
+    p = document.createElement("div");
+    p.id = "calPop";
+    p.className = "cal-pop";
+    document.body.appendChild(p);
+  }
+  return p;
+}
+function markPickBtn(which, on) {
+  const b = document.getElementById(which + "Pick");
+  if (b) b.classList.toggle("on", !!on);
+}
+function shiftMonth(delta) {
+  const t = CAL.y * 12 + (CAL.m - 1) + delta;
+  CAL.y = Math.floor(t / 12);
+  CAL.m = (t % 12 + 12) % 12 + 1;
+}
+function gotoToday() {
+  const t = today0();
+  CAL.y = t.getFullYear();
+  CAL.m = t.getMonth() + 1;
+}
+function drawCalendar() {
+  const p = calEl();
+  const todayIso = isoFromDay(0);
+  const lead = (new Date(CAL.y, CAL.m - 1, 1).getDay() + 6) % 7; // 周一为一周起点
+  const days = new Date(CAL.y, CAL.m, 0).getDate();
+  let cells = "";
+  for (let i = 0; i < lead; i++) cells += '<div class="cal-day empty"></div>';
+  for (let d = 1; d <= days; d++) {
+    const iso = makeISO(CAL.y, CAL.m, d);
+    const wd = new Date(CAL.y, CAL.m - 1, d).getDay();
+    const cls = "cal-day" + (iso === todayIso ? " today" : "") +
+      (iso === CAL.sel ? " sel" : "") + ((wd === 0 || wd === 6) ? " weekend" : "");
+    cells += '<div class="' + cls + '" data-d="' + d + '">' + d + "</div>";
+  }
+  p.innerHTML =
+    '<div class="cal-head">' +
+      '<button type="button" class="cal-nav" data-nav="-12" title="上一年">&laquo;</button>' +
+      '<button type="button" class="cal-nav" data-nav="-1" title="上个月">&lsaquo;</button>' +
+      '<div class="cal-title">' + CAL.y + " 年 " + CAL.m + " 月</div>" +
+      '<button type="button" class="cal-nav" data-nav="1" title="下个月">&rsaquo;</button>' +
+      '<button type="button" class="cal-nav" data-nav="12" title="下一年">&raquo;</button>' +
+    "</div>" +
+    '<div class="cal-quick">' + CAL_QUICK.map(q => '<button type="button" data-quick="' + q + '">' + q + "</button>").join("") + "</div>" +
+    '<div class="cal-week">' + WD.map(w => "<span>" + w + "</span>").join("") + "</div>" +
+    '<div class="cal-grid">' + cells + "</div>" +
+    '<div class="cal-foot">' +
+      '<button type="button" class="cal-clear" data-act="clear">清除日期</button>' +
+      '<button type="button" data-act="today">回到本月</button>' +
+      '<button type="button" data-act="close">关闭</button>' +
+    "</div>";
+}
+function positionCalendar() {
+  if (!CAL.which) return;
+  const p = calEl();
+  const inp = document.getElementById(CAL.which + "Deadline");
+  if (!inp) return;
+  const r = inp.getBoundingClientRect();
+  const pw = p.offsetWidth || 268, ph = p.offsetHeight || 320;
+  let top = r.bottom + 6;
+  if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 6);
+  let left = r.left;
+  if (left + pw > window.innerWidth - 8) left = Math.max(8, window.innerWidth - pw - 8);
+  p.style.left = left + "px";
+  p.style.top = top + "px";
+}
+function openPicker(which) {
+  const inp = document.getElementById(which + "Deadline");
+  if (!inp) return;
+  if (CAL.open && CAL.which === which) { closePicker(); return; }
+  closePicker();
+  const raw = (inp.value || "").trim();
+  const iso = isISO(raw) ? raw : parseDeadline(raw);
+  CAL.which = which;
+  CAL.sel = iso || "";
+  if (CAL.sel) {
+    const b = new Date(CAL.sel + "T00:00:00");
+    CAL.y = b.getFullYear(); CAL.m = b.getMonth() + 1;
+  } else gotoToday();
+  CAL.open = true;
+  drawCalendar();
+  const p = calEl();
+  p.classList.add("show");
+  positionCalendar();
+  markPickBtn(which, true);
+}
+function closePicker() {
+  const p = document.getElementById("calPop");
+  if (p) p.classList.remove("show");
+  if (CAL.which) markPickBtn(CAL.which, false);
+  CAL.open = false;
+  CAL.which = null;
+}
+function calPick(iso) {
+  if (!iso || !CAL.which) return;
+  const which = CAL.which;
+  const inp = document.getElementById(which + "Deadline");
+  closePicker();
+  if (!inp) return;
+  inp.value = iso;
+  previewDeadline(which);
+  inp.focus();
+}
+function calSetDate(iso, which) {
+  CAL.which = which; calPick(iso);
+}
+/* 日历内部点击（事件委托，面板重建也无需重新绑定） */
+document.addEventListener("click", function (e) {
+  const p = document.getElementById("calPop");
+  if (!p || !CAL.open || !p.contains(e.target)) return;
+  const which = CAL.which;
+  const day = e.target.closest(".cal-day[data-d]");
+  if (day) { calPick(makeISO(CAL.y, CAL.m, +day.dataset.d)); return; }
+  const quick = e.target.closest("[data-quick]");
+  if (quick) { calPick(parseDeadline(quick.dataset.quick)); return; }
+  const nav = e.target.closest("[data-nav]");
+  if (nav) { shiftMonth(+nav.dataset.nav); CAL.which = which; drawCalendar(); positionCalendar(); return; }
+  const act = e.target.closest("[data-act]");
+  if (act) {
+    CAL.which = which;
+    if (act.dataset.act === "clear") {
+      closePicker();
+      const inp = document.getElementById(which + "Deadline");
+      if (inp) { inp.value = ""; previewDeadline(which); }
+    } else if (act.dataset.act === "today") {
+      gotoToday(); drawCalendar(); positionCalendar();
+    } else closePicker();
+  }
+});
+/* 点击日历外部关闭（mousedown + touchstart 双保险，兼容移动端） */
+function closeOnOutside(t) {
+  if (!CAL.open) return;
+  const p = document.getElementById("calPop");
+  if (p && t && p.contains(t)) return;
+  if (t && t.closest && t.closest(".pick-btn")) return; // 交给 openPicker 自己 toggle
+  closePicker();
+}
+document.addEventListener("mousedown", function (e) { closeOnOutside(e.target); }, true);
+document.addEventListener("touchstart", function (e) { closeOnOutside(e.touches && e.touches[0] ? e.touches[0].target : e.target); }, true);
+window.addEventListener("resize", function () { if (CAL.open) positionCalendar(); });
+window.addEventListener("scroll", function () { if (CAL.open) positionCalendar(); }, true);
+
+/* ---------------- 顶部日期信息 ---------------- */
+function renderMeta() {
+  const el = document.getElementById("metaLine");
+  if (!el) return;
+  const t = today0();
+  let soon = 0;
+  items.forEach(i => {
+    if (i.deleted || checked[i.id]) return;
+    const iso = resolveISO(i);
+    if (!iso) return;
+    const info = deadlineInfo(iso);
+    if (info && info.diff >= 0 && info.diff <= 3) soon++;
+  });
+  el.textContent = "今天是 " + t.toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" }) +
+    (soon ? " · 未来 3 天内到期 " + soon + " 项" : " · 近 3 天无到期项");
+}
+
+/* ---------------- 渲染 ---------------- */
+function visibleRows() {
+  const rows = items.map((item, idx) => ({ item, idx })).filter(r => !r.item.deleted);
+  if (sortByDeadline) {
+    const val = it => { const iso = resolveISO(it); return iso || "9999-12-31"; };
+    rows.sort((a, b) => {
+      const av = val(a.item), bv = val(b.item);
+      if (av !== bv) return av < bv ? -1 : 1;
+      return a.idx - b.idx;
+    });
+  }
+  return rows;
+}
+
+function render() {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+  if (!items.some(i => !i.deleted)) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "暂无待办项，在下方输入框添加一条试试 ✍️";
+    list.appendChild(empty);
+  }
+  let doneCount = 0, lateCount = 0;
+  visibleRows().forEach(({ item, idx }, order) => {
+    const isChk = !!checked[item.id];
+    if (isChk) doneCount++;
+    const iso = resolveISO(item);
+    const dl = iso ? deadlineInfo(iso) : null;
+    if (dl && dl.diff < 0 && !isChk) lateCount++;
+
+    const metaBadges = [];
+    if (item.owner) metaBadges.push(`<span class="badge owner" title="负责人">👤 ${esc(item.owner)}</span>`);
+    if (dl) {
+      metaBadges.push(`<span class="badge deadline ${dl.cls}" title="截止：${esc(dl.raw)}">⏰ ${esc(dl.label)}</span>`);
+    } else if (item.deadlineText) {
+      metaBadges.push(`<span class="badge deadline unparsed" title="未能识别为日期，原样显示">⏰ ${esc(item.deadlineText)}</span>`);
+    }
+
+    const div = document.createElement("div");
+    div.className = "item" + (isChk ? " checked" : "");
+    div.innerHTML = `
+      <div class="checkbox" data-idx="${idx}" title="标记完成"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <span class="no">${order + 1}</span>
+      <div class="body">
+        <div class="line1">
+          <span class="content">${esc(item.text)}</span>
+          ${item.note ? `<span class="note ${noteClass(item.note)}">${esc(item.note)}</span>` : ''}
+        </div>
+        ${metaBadges.length ? `<div class="metaRow">${metaBadges.join("")}</div>` : ''}
+      </div>
+      <div class="actions">
+        <button class="act-btn edit" data-idx="${idx}" title="编辑">✎</button>
+        <button class="act-btn del" data-idx="${idx}" title="删除">✕</button>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+  const active = items.filter(i => !i.deleted);
+  document.getElementById("total").textContent = active.length;
+  document.getElementById("done").textContent = doneCount;
+  document.getElementById("late").textContent = lateCount;
+  renderMeta();
+  const sortBtn = document.getElementById("sortBtn");
+  sortBtn.classList.toggle("active", sortByDeadline);
+  sortBtn.textContent = sortByDeadline ? "✓ 按截止日期排序" : "按截止日期排序";
+}
+
+// Event delegation
+document.getElementById("list").addEventListener("click", function(e) {
+  const cb = e.target.closest(".checkbox");
+  if (cb) {
+    const idx = +cb.dataset.idx;
+    const id = items[idx].id;
+    checked[id] = !checked[id];
+    if (!checked[id]) delete checked[id];
+    saveData(); render();
+    return;
+  }
+  const editBtn = e.target.closest(".act-btn.edit");
+  if (editBtn) {
+    openEdit(+editBtn.dataset.idx);
+    return;
+  }
+  const delBtn = e.target.closest(".act-btn.del");
+  if (delBtn) {
+    openDel(+delBtn.dataset.idx);
+    return;
+  }
+});
+
+// Add item
+function addItem() {
+  const input = document.getElementById("addInput");
+  const ownerInput = document.getElementById("addOwner");
+  const dateInput = document.getElementById("addDeadline");
+  const text = input.value.trim();
+  const rawDate = dateInput.value;
+  if (!text) {
+    if (!rawDate.trim()) { input.focus(); return; }
+    // 只填了日期没填内容时给提示，避免"看起来没反应"
+    previewDeadline("add");
+    const box = document.getElementById("addPreview");
+    box.textContent = "⚠ 请先输入待办内容"; box.className = "dl-preview warn";
+    input.focus();
+    return;
+  }
+  const maxId = items.reduce((m, i) => Math.max(m, i.id), 0);
+  const it = { id: maxId + 1, text, note: "", owner: ownerInput.value.trim(), deadline: "", deadlineText: "" };
+  applyDeadline(it, rawDate);
+  items.push(it);
+  input.value = ""; ownerInput.value = ""; dateInput.value = "";
+  previewDeadline("add");
+  input.focus();
+  saveData(); render();
+}
+
+// Edit modal
+function openEdit(idx) {
+  editIdx = idx;
+  document.getElementById("editText").value = items[idx].text;
+  document.getElementById("editNote").value = items[idx].note || "";
+  document.getElementById("editOwner").value = items[idx].owner || "";
+  document.getElementById("editDeadline").value = items[idx].deadline || items[idx].deadlineText || "";
+  previewDeadline("edit");
+  document.getElementById("editModal").classList.add("show");
+  document.getElementById("editText").focus();
+}
+function closeEdit() {
+  closePicker();
+  document.getElementById("editModal").classList.remove("show");
+  editIdx = -1;
+}
+function clearDeadline() {
+  closePicker();
+  document.getElementById("editDeadline").value = "";
+  previewDeadline("edit");
+}
+function saveEdit() {
+  if (editIdx < 0) return;
+  const text = document.getElementById("editText").value.trim();
+  if (!text) return;
+  items[editIdx].text = text;
+  items[editIdx].note = document.getElementById("editNote").value.trim();
+  items[editIdx].owner = document.getElementById("editOwner").value.trim();
+  applyDeadline(items[editIdx], document.getElementById("editDeadline").value);
+  closeEdit();
+  saveData(); render();
+}
+
+// Delete modal
+function openDel(idx) {
+  delIdx = idx;
+  document.getElementById("delText").textContent = `删除「${items[idx].text}」？`;
+  document.getElementById("delModal").classList.add("show");
+}
+function closeDel() {
+  document.getElementById("delModal").classList.remove("show");
+  delIdx = -1;
+}
+function confirmDel() {
+  if (delIdx < 0) return;
+  items.splice(delIdx, 1);
+  closeDel();
+  saveData(); render();
+}
+
+// Toolbar
+function toggleSort() {
+  sortByDeadline = !sortByDeadline;
+  saveData(); render();
+}
+
+function resetChecks() {
+  if (!confirm("重置所有勾选状态？")) return;
+  checked = {};
+  saveData(); render();
+}
+
+function exportData() {
+  const lines = visibleRows().map(({ item }, i) => {
+    const chk = checked[item.id] ? "✓" : " ";
+    const parts = [`${i + 1}. [${chk}] ${item.text}`];
+    if (item.owner) parts.push(`负责人: ${item.owner}`);
+    const iso = resolveISO(item);
+    if (iso) {
+      const dl = deadlineInfo(iso);
+      parts.push(`截止: ${iso}${dl && dl.diff < 0 ? "（已逾期）" : ""}`);
+    } else if (item.deadlineText) {
+      parts.push(`截止: ${item.deadlineText}`);
+    }
+    if (item.note) parts.push(`备注: ${item.note}`);
+    return parts.join("  |  ");
+  });
+  const head = `制卡技术待办清单  导出时间：${new Date().toLocaleString("zh-CN")}\n共 ${lines.length} 项\n\n`;
+  const blob = new Blob([head + lines.join("\n")], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "制卡技术待办清单.txt";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function clearAll() {
+  if (!confirm("清空所有数据并恢复默认？此操作不可撤销！")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  LEGACY_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+  items = DEFAULT_ITEMS.map(i => ({ ...i }));
+  checked = {};
+  saveData(); render();
+}
+
+// Close modals on overlay click
+document.getElementById("editModal").addEventListener("click", function(e) {
+  if (e.target === this) closeEdit();
+});
+document.getElementById("delModal").addEventListener("click", function(e) {
+  if (e.target === this) closeDel();
+});
+
+// Keyboard: Escape closes modals
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") { if (CAL.open) { closePicker(); return; } closeEdit(); closeDel(); }
+  if (e.key === "Enter" && editIdx >= 0 && e.target.tagName !== "TEXTAREA") { saveEdit(); }
+});
+
+loadData();
+render();
+</script>
+</body>
+</html>
