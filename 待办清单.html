@@ -1,9 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
-<head>
+<html lang="zh-CN"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>制卡技术待办清单</title>
+<title>待办清单</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; padding: 20px; min-height: 100vh; }
@@ -122,6 +121,16 @@ h1 { font-size: 24px; text-align: center; margin-bottom: 8px; color: #1a1a1a; }
 .save-indicator { color: #2E7D32; font-weight: 600; opacity: 0; transition: opacity 0.3s; }
 .save-indicator.show { opacity: 1; }
 
+/* 文件绑定条 */
+.filebar { display: flex; align-items: center; gap: 10px; justify-content: center; flex-wrap: wrap; background: #fff; border-radius: 8px; padding: 8px 14px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); font-size: 13px; }
+.filebar .fb-status { color: #666; }
+.filebar .fb-status.ok { color: #2E7D32; font-weight: 600; }
+.filebar .fb-status.warn { color: #b26a00; font-weight: 600; }
+.filebar button { background: #2B579A; color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: background 0.15s; }
+.filebar button:hover { background: #1e3f6e; }
+.filebar button.ghost { background: #fff; color: #666; border: 1px solid #ddd; }
+.filebar button.ghost:hover { border-color: #999; color: #333; background: #fff; }
+
 /* Add form at bottom */
 .add-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; align-items: center; }
 .add-row input { border: 2px dashed #ccc; border-radius: 8px; padding: 10px 12px; font-size: 14px; outline: none; transition: border-color 0.15s; font-family: inherit; background: #fff; }
@@ -143,8 +152,13 @@ h1 { font-size: 24px; text-align: center; margin-bottom: 8px; color: #1a1a1a; }
 </head>
 <body>
 <div class="container">
-<h1>制卡技术待办清单</h1>
+<h1>待办清单</h1>
 <p class="meta" id="metaLine"></p>
+<div class="filebar" id="fileBar">
+  <span class="fb-status" id="fileStatus">正在检查文件绑定…</span>
+  <button id="bindBtn" type="button" onclick="onBindClick()">📎 绑定本文件（自动保存）</button>
+  <button id="exportHtmlBtn" class="ghost" type="button" style="display:none" onclick="exportHtml()">⬇ 下载 HTML</button>
+</div>
 <div class="stats">
   <div class="stat">共 <b id="total">0</b> 项</div>
   <div class="stat done">已完成 <b id="done">0</b> 项</div>
@@ -161,8 +175,7 @@ h1 { font-size: 24px; text-align: center; margin-bottom: 8px; color: #1a1a1a; }
   <input id="addInput" class="add-text" placeholder="输入新待办项..." onkeydown="if(event.key==='Enter')addItem()">
   <input id="addOwner" class="add-owner" placeholder="负责人" onkeydown="if(event.key==='Enter')addItem()">
   <div class="add-deadline-wrap">
-    <input id="addDeadline" class="add-date" placeholder="截止日期（可点 📅）" autocomplete="off"
-           oninput="previewDeadline('add')" onkeydown="if(event.key==='Enter')addItem()">
+    <input id="addDeadline" class="add-date" placeholder="截止日期（可点 📅）" autocomplete="off" oninput="previewDeadline('add')" onkeydown="if(event.key==='Enter')addItem()">
     <button class="pick-btn" id="addPick" type="button" title="从日历选择" onclick="openPicker('add')">📅</button>
   </div>
   <button class="add-btn" onclick="addItem()">添加</button>
@@ -170,7 +183,7 @@ h1 { font-size: 24px; text-align: center; margin-bottom: 8px; color: #1a1a1a; }
 </div>
 <div class="footer">
   <span class="save-indicator" id="saveHint">已保存</span>
-  <span>所有操作自动保存到浏览器本地 · 下方示例项可直接删除</span>
+  <span>数据保存在本 HTML 文件内 · 绑定文件后改动自动写回 · 可像 txt 一样复制/移动</span>
 </div>
 </div>
 
@@ -216,45 +229,68 @@ h1 { font-size: 24px; text-align: center; margin-bottom: 8px; color: #1a1a1a; }
 </div>
 </div>
 
+<!-- ===== 数据（内嵌在本文件里，文件即数据） ===== -->
+<script id="todoData" type="application/json">{"updatedAt":1790576169124,"items":[{"id":1,"text":"示例：整理接口文档，同步确认字段","note":"","owner":"张三","deadline":"2026-09-30","deadlineText":""}],"checked":{"2":true},"sortByDeadline":false}</script>
+
 <script>
 const STORAGE_KEY = "zhika_todo_data_v2";
-const LEGACY_KEYS = ["zhika_todo_data"]; // 旧版本存档（含内置 demo 数据），首次加载时清除
+const LEGACY_KEYS = ["zhika_todo_data"]; // 旧版本存档，首次加载时清除
+const IDB_NAME = "zhika_todo_fs";
+const IDB_STORE = "handles";
+const IDB_KEY = "todoFile";
 
 const DEFAULT_ITEMS = [
-  {id:1,text:"示例：整理制卡接口文档，同步给后端确认字段",note:"",owner:"张三",deadline:isoFromDay(2),deadlineText:""},
+  {id:1,text:"示例：整理接口文档，同步确认字段",note:"",owner:"张三",deadline:"",deadlineText:"后天"},
 ];
 let items, checked, sortByDeadline = false;
 let editIdx = -1, delIdx = -1;
 
+/* ===== 文件绑定相关状态 ===== */
+let fileHandle = null;     // 当前绑定的 HTML 文件句柄
+let saveTimer = null;      // 写文件防抖
+
+/* ============================================================
+   数据加载：优先取「文件内嵌 JSON」，其次取浏览器 localStorage 镜像，
+   两者都有时取时间戳较新的，保证不丢改动。
+   ============================================================ */
+function readEmbedded() {
+  const tag = document.getElementById("todoData");
+  if (!tag) return null;
+  try { return JSON.parse(tag.textContent || "{}"); } catch (e) { return null; }
+}
+function readMirror() {
+  try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : null; }
+  catch (e) { return null; }
+}
+
 function loadData() {
-  // 一次性清除旧版本存档（里面的内置 demo 数据不再加载）
   LEGACY_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) {
-    try {
-      const d = JSON.parse(saved);
-      items = (d.items || DEFAULT_ITEMS).map(i => ({ ...i }));
-      checked = d.checked || {};
-      sortByDeadline = !!d.sortByDeadline;
-    } catch(e) {
-      items = DEFAULT_ITEMS.map(i => ({ ...i }));
-      checked = {};
-    }
+
+  const embedded = readEmbedded();
+  const mirror = readMirror();
+  const eAt = (embedded && embedded.updatedAt) || 0;
+  const mAt = (mirror && mirror.updatedAt) || 0;
+  const d = (mirror && mAt > eAt) ? mirror : (embedded || mirror || null);
+
+  if (d && Array.isArray(d.items)) {
+    items = d.items.map(i => ({ ...i }));
+    checked = d.checked || {};
+    sortByDeadline = !!d.sortByDeadline;
   } else {
     items = DEFAULT_ITEMS.map(i => ({ ...i }));
     checked = {};
+    sortByDeadline = false;
   }
+
   // 兼容旧数据：补齐 / 归一化字段
   items.forEach(i => {
     if (typeof i.owner !== "string") i.owner = "";
     if (typeof i.deadlineText !== "string") i.deadlineText = "";
     if (typeof i.deadline !== "string") i.deadline = "";
-    // 旧版本可能把无法识别的文字存进了 deadline，这里保留为 deadlineText
     if (i.deadline && !isISO(i.deadline)) {
       if (!i.deadlineText) i.deadlineText = i.deadline;
       i.deadline = "";
     }
-    // deadlineText 若能解析则升级为标准日期
     if (!i.deadline && i.deadlineText) {
       const up = parseDeadline(i.deadlineText);
       if (up) { i.deadline = up; i.deadlineText = ""; }
@@ -262,13 +298,197 @@ function loadData() {
   });
 }
 
-function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ items, checked, sortByDeadline }));
-  const hint = document.getElementById("saveHint");
-  hint.classList.add("show");
-  setTimeout(() => hint.classList.remove("show"), 1500);
+/* ============================================================
+   保存：写 localStorage 镜像；若已绑定文件则同时写回 HTML 文件
+   ============================================================ */
+function currentPayload(ts) {
+  return { updatedAt: ts || Date.now(), items, checked, sortByDeadline };
 }
 
+function saveData() {
+  const ts = Date.now();
+  const payload = currentPayload(ts);
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch (e) {}
+
+  if (fileHandle) {
+    showSaved("保存中…");
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(writeFileNow, 400);
+  } else {
+    showSaved("已暂存本机（未绑定文件）");
+  }
+}
+
+// 把当前内存数据生成完整 HTML 文本（替换内嵌数据块）
+function buildHTML(ts) {
+  const payload = currentPayload(ts);
+  const json = JSON.stringify(payload).replace(/</g, "\\u003c");
+  const block = '<script id="todoData" type="application/json">' + json + '<\/script>';
+  return HTML_TEMPLATE.replace(JSON_RE, block);
+}
+
+// 真正写回文件
+async function writeFileNow() {
+  if (!fileHandle) return;
+  try {
+    const ok = await ensurePermission(fileHandle);
+    if (!ok) { updateStatus("needperm", fileHandle.name); showSaved("⚠ 需要重新授权"); return; }
+    const ts = Date.now();
+    const html = buildHTML(ts);
+    const w = await fileHandle.createWritable();
+    await w.write(html);
+    await w.close();
+    // 镜像与文件使用同一时间戳，避免「镜像比文件新」导致下次优先读镜像
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(currentPayload(ts))); } catch (e) {}
+    updateStatus("bound", fileHandle.name);
+    showSaved("已保存到文件");
+  } catch (err) {
+    console.error(err);
+    showSaved("⚠ 保存失败：" + (err && err.message ? err.message : err));
+    revealExport();
+  }
+}
+
+function showSaved(msg) {
+  const hint = document.getElementById("saveHint");
+  if (!hint) return;
+  if (msg) hint.textContent = msg;
+  hint.classList.add("show");
+  clearTimeout(showSaved._t);
+  showSaved._t = setTimeout(() => hint.classList.remove("show"), 1600);
+}
+
+/* ============================================================
+   文件绑定（File System Access API）
+   ============================================================ */
+function fsSupported() { return typeof window.showOpenFilePicker === "function"; }
+
+async function ensurePermission(handle) {
+  if (!handle || typeof handle.queryPermission !== "function") return true;
+  const opts = { mode: "readwrite" };
+  try {
+    if ((await handle.queryPermission(opts)) === "granted") return true;
+    return (await handle.requestPermission(opts)) === "granted";
+  } catch (e) { return false; }
+}
+
+async function onBindClick() {
+  // 已有句柄（可能只是缺权限）→ 直接重新授权
+  if (fileHandle) {
+    const ok = await ensurePermission(fileHandle);
+    if (ok) { updateStatus("bound", fileHandle.name); await writeFileNow(); }
+    else { updateStatus("needperm", fileHandle.name); showSaved("⚠ 未授权，仍用本机缓存"); }
+    return;
+  }
+  await bindFile();
+}
+
+async function bindFile() {
+  if (!fsSupported()) { updateStatus("unsupported"); revealExport(); return; }
+  try {
+    const picked = await window.showOpenFilePicker({
+      multiple: false,
+      types: [{ description: "HTML 文件", accept: { "text/html": [".html", ".htm"] } }]
+    });
+    fileHandle = picked[0];
+    try { await idbSet(IDB_KEY, fileHandle); } catch (e) {}
+    const ok = await ensurePermission(fileHandle);
+    if (!ok) { updateStatus("needperm", fileHandle.name); return; }
+    await writeFileNow(); // 绑定后立即把当前数据写回文件
+  } catch (err) {
+    if (err && err.name === "AbortError") return; // 用户取消
+    console.error(err);
+    showSaved("⚠ 绑定失败：" + (err && err.message ? err.message : err));
+    revealExport();
+  }
+}
+
+function revealExport() {
+  const b = document.getElementById("exportHtmlBtn");
+  if (b) b.style.display = "";
+}
+
+// 兜底：下载更新后的 HTML（不支持直接写文件时用）
+function exportHtml() {
+  const html = buildHTML(Date.now());
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "待办清单.html";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  showSaved("已下载，请用它替换原文件");
+}
+
+function updateStatus(kind, name) {
+  const el = document.getElementById("fileStatus");
+  const btn = document.getElementById("bindBtn");
+  if (!el) return;
+  if (kind === "unsupported") {
+    el.textContent = "⚠ 当前浏览器不支持直接写文件（建议用 Chrome / Edge 打开）";
+    el.className = "fb-status warn";
+    if (btn) btn.style.display = "none";
+  } else if (kind === "bound") {
+    el.textContent = "✅ 已绑定 " + (name || "文件") + " · 改动自动写入文件";
+    el.className = "fb-status ok";
+    if (btn) { btn.style.display = ""; btn.textContent = "重新绑定文件"; }
+  } else if (kind === "needperm") {
+    el.textContent = "⚠ " + (name || "文件") + " 需要重新授权";
+    el.className = "fb-status warn";
+    if (btn) { btn.style.display = ""; btn.textContent = "重新连接文件"; }
+  } else {
+    el.textContent = "未绑定文件 · 改动暂存本机浏览器（点右侧绑定后自动写入本文件）";
+    el.className = "fb-status";
+    if (btn) { btn.style.display = ""; btn.textContent = "📎 绑定本文件（自动保存）"; }
+  }
+}
+
+async function initFileBinding() {
+  if (!fsSupported()) { updateStatus("unsupported"); revealExport(); return; }
+  let handle = null;
+  try { handle = await idbGet(IDB_KEY); } catch (e) { handle = null; }
+  if (handle) {
+    fileHandle = handle;
+    let perm = "prompt";
+    try { perm = handle.queryPermission ? await handle.queryPermission({ mode: "readwrite" }) : "granted"; } catch (e) {}
+    if (perm === "granted") updateStatus("bound", handle.name);
+    else updateStatus("needperm", handle.name);
+  } else {
+    updateStatus("unbound");
+  }
+}
+
+/* ============================================================
+   IndexedDB：记住文件句柄（持久化，方便下次直接续用）
+   ============================================================ */
+function idbOpen() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(IDB_NAME, 1);
+    r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(IDB_STORE)) r.result.createObjectStore(IDB_STORE); };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function idbSet(k, v) {
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const t = db.transaction(IDB_STORE, "readwrite");
+    t.objectStore(IDB_STORE).put(v, k);
+    t.oncomplete = () => res();
+    t.onerror = () => rej(t.error);
+  });
+}
+async function idbGet(k) {
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const t = db.transaction(IDB_STORE, "readonly");
+    const q = t.objectStore(IDB_STORE).get(k);
+    q.onsuccess = () => res(q.result);
+    q.onerror = () => rej(q.error);
+  });
+}
+
+/* ---------------- 其余逻辑（保持原有行为） ---------------- */
 function noteClass(note) {
   if (!note) return "";
   if (note.includes("✓")) return "check";
@@ -284,13 +504,12 @@ function isISO(s) {
   const d = new Date(s + "T00:00:00");
   return !isNaN(d.getTime());
 }
-// 兼容旧的 yyyy-m-d 之类
 function isValidDate(s) { return !!parseDeadline(s); }
 
 function makeISO(y, m, d) {
   if (!(y >= 1900 && y <= 2999) || !(m >= 1 && m <= 12) || !(d >= 1 && d <= 31)) return null;
   const dt = new Date(y, m - 1, d);
-  if (dt.getFullYear() !== y || dt.getMonth() + 1 !== m || dt.getDate() !== d) return null; // 2月30日等
+  if (dt.getFullYear() !== y || dt.getMonth() + 1 !== m || dt.getDate() !== d) return null;
   return y + "-" + pad2(m) + "-" + pad2(d);
 }
 
@@ -303,8 +522,8 @@ function addMonths(months) {
   const t = today0();
   const total = t.getFullYear() * 12 + t.getMonth() + months;
   const y = Math.floor(total / 12), mo = total % 12;
-  const d = new Date(y, mo + 1, 0);            // 目标月最后一天
-  d.setDate(Math.min(t.getDate(), d.getDate())); // 今天几号就几号，月末不越界
+  const d = new Date(y, mo + 1, 0);
+  d.setDate(Math.min(t.getDate(), d.getDate()));
   return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
 }
 function shiftISO(iso, days) {
@@ -315,22 +534,10 @@ function shiftISO(iso, days) {
 const WEEK_MAP = { "一":1, "二":2, "三":3, "四":4, "五":5, "六":6, "日":0, "天":0, "1":1, "2":2, "3":3, "4":4, "5":5, "6":6, "7":0 };
 const REL_MAP = { "今天":0, "明天":1, "后天":2, "大后天":3, "昨天":-1 };
 
-/**
- * 宽松解析：接受多种写法，返回 "YYYY-MM-DD"；识别不了返回 null
- * 支持：2026-10-20 / 2026/10/20 / 2026.10.20 / 2026年10月20日
- *       10-20 / 10/20 / 10.20 / 10月20日（无年份→本年，已过则视为明年）
- *       20261020 / 261020
- *       今天 明天 后天 大后天 昨天 明天晚上? （仅精确匹配）
- *       3天后 / 5天前 / 2周后 / 1个月后
- *       周五 / 星期五 / 下周三 / 礼拜六
- *       月底 / 本月月底 / 下月底
- *       ISO 周外：+3d +2w -5d
- */
 function parseDeadline(raw) {
   const s = String(raw || "").trim();
   if (!s) return null;
 
-  // 相对天数偏移：+3d / +2w / -5天
   const off = s.match(/^([+-])\s*(\d+)\s*(d|w|天|周|个?星期|days?)?$/i);
   if (off) {
     const sign = off[1] === "-" ? -1 : 1;
@@ -339,15 +546,12 @@ function parseDeadline(raw) {
     return isoFromDay(n);
   }
 
-  // 带年份
   let m = s.match(/^(\d{4})\s*[-\/.年月]\s*(\d{1,2})\s*[-\/.月]\s*(\d{1,2})\s*日?$/);
   if (m) return makeISO(+m[1], +m[2], +m[3]);
 
-  // 纯数字 8 位 / 6 位
   if (/^\d{8}$/.test(s)) return makeISO(+s.slice(0,4), +s.slice(4,6), +s.slice(6,8));
   if (/^\d{6}$/.test(s)) return makeISO(2000 + (+s.slice(0,2)), +s.slice(2,4), +s.slice(4,6));
 
-  // 月底
   const me = s.match(/^(?:本月|这个月|本|下(?:个月|周)?|下个)?月[底末]$/);
   if (me) {
     const t = today0();
@@ -357,16 +561,14 @@ function parseDeadline(raw) {
     return makeISO(last.getFullYear(), last.getMonth() + 1, last.getDate());
   }
 
-  // 中文相对量：3天后 / 5天前 / 2周后 / 1个月后（"后"为未来，"前"为过去）
   const rl = s.match(/^(\d{1,3})\s*(天|日|周|星期|礼拜|个?月)\s*(之?后|以?后|之?前|以?前)$/);
   if (rl) {
     const n = +rl[1], sign = /后/.test(rl[3]) ? 1 : -1;
     if (/^(天|日)$/.test(rl[2])) return isoFromDay(sign * n);
     if (/^(周|星期|礼拜)$/.test(rl[2])) return isoFromDay(sign * n * 7);
-    return addMonths(sign * n); // 按月进位，自动处理跨年和月末
+    return addMonths(sign * n);
   }
 
-  // 语义日期
   if (REL_MAP[s] !== undefined) return isoFromDay(REL_MAP[s]);
   const nextRel = s.match(/^下(?:个)?(周|星期|礼拜)([一二三四五六日天1-7])$/);
   if (nextRel) {
@@ -382,7 +584,6 @@ function parseDeadline(raw) {
     return isoFromDay(diff >= 0 ? diff : diff + 7);
   }
 
-  // 无年份（本年，若已过 60 天以上则视为明年）
   m = s.match(/^(\d{1,2})\s*[-\/.月]\s*(\d{1,2})\s*日?$/);
   if (m) {
     const mm = +m[1], dd = +m[2];
@@ -396,7 +597,6 @@ function parseDeadline(raw) {
   return null;
 }
 
-/** 取条目的 ISO：优先 deadline，其次解析文字（兼容旧数据） */
 function resolveISO(item) {
   if (item.deadline && isISO(item.deadline)) return item.deadline;
   const cand = item.deadline || item.deadlineText || "";
@@ -404,7 +604,6 @@ function resolveISO(item) {
   return parseDeadline(cand);
 }
 
-/** 写入条目日期：能识别→存 ISO；识别不了→按原文存 deadlineText，绝不丢弃 */
 function applyDeadline(item, raw) {
   const text = String(raw || "").trim();
   const iso = parseDeadline(text);
@@ -412,7 +611,6 @@ function applyDeadline(item, raw) {
   item.deadlineText = iso ? "" : text;
 }
 
-// { diff, cls, label, raw } 或 null
 function deadlineInfo(iso) {
   if (!iso || !isISO(iso)) return null;
   const dt = new Date(iso + "T00:00:00");
@@ -437,7 +635,6 @@ function previewDeadline(which) {
   if (!box) return;
   const raw = (document.getElementById(which + "Deadline").value || "").trim();
   const DEFAULT_HINT = "截止日期支持：10-20 / 2026-10-20 / 明天 / 下周三，或点 📅 直接选日期";
-  // add 区的提示独占一行，需保留 add-hint 以免宽度被 flex 挤窄
   const base = which === "add" ? "add-hint dl-preview" : "dl-preview";
   if (!raw) { box.textContent = which === "add" ? DEFAULT_HINT : ""; box.className = base; return; }
   const iso = parseDeadline(raw);
@@ -451,7 +648,7 @@ function previewDeadline(which) {
   }
 }
 
-/* ---------------- 自建日历弹层（不依赖浏览器原生控件，Safari / 微信内置浏览器同样可用） ---------------- */
+/* ---------------- 自建日历弹层 ---------------- */
 const CAL = { which: null, y: 0, m: 0, sel: "", open: false };
 const CAL_QUICK = ["今天", "明天", "后天", "本周五", "下周三", "月底"];
 const WD = ["一", "二", "三", "四", "五", "六", "日"];
@@ -483,7 +680,7 @@ function gotoToday() {
 function drawCalendar() {
   const p = calEl();
   const todayIso = isoFromDay(0);
-  const lead = (new Date(CAL.y, CAL.m - 1, 1).getDay() + 6) % 7; // 周一为一周起点
+  const lead = (new Date(CAL.y, CAL.m - 1, 1).getDay() + 6) % 7;
   const days = new Date(CAL.y, CAL.m, 0).getDate();
   let cells = "";
   for (let i = 0; i < lead; i++) cells += '<div class="cal-day empty"></div>';
@@ -565,7 +762,6 @@ function calPick(iso) {
 function calSetDate(iso, which) {
   CAL.which = which; calPick(iso);
 }
-/* 日历内部点击（事件委托，面板重建也无需重新绑定） */
 document.addEventListener("click", function (e) {
   const p = document.getElementById("calPop");
   if (!p || !CAL.open || !p.contains(e.target)) return;
@@ -588,12 +784,11 @@ document.addEventListener("click", function (e) {
     } else closePicker();
   }
 });
-/* 点击日历外部关闭（mousedown + touchstart 双保险，兼容移动端） */
 function closeOnOutside(t) {
   if (!CAL.open) return;
   const p = document.getElementById("calPop");
   if (p && t && p.contains(t)) return;
-  if (t && t.closest && t.closest(".pick-btn")) return; // 交给 openPicker 自己 toggle
+  if (t && t.closest && t.closest(".pick-btn")) return;
   closePicker();
 }
 document.addEventListener("mousedown", function (e) { closeOnOutside(e.target); }, true);
@@ -686,7 +881,6 @@ function render() {
   sortBtn.textContent = sortByDeadline ? "✓ 按截止日期排序" : "按截止日期排序";
 }
 
-// Event delegation
 document.getElementById("list").addEventListener("click", function(e) {
   const cb = e.target.closest(".checkbox");
   if (cb) {
@@ -709,7 +903,6 @@ document.getElementById("list").addEventListener("click", function(e) {
   }
 });
 
-// Add item
 function addItem() {
   const input = document.getElementById("addInput");
   const ownerInput = document.getElementById("addOwner");
@@ -718,7 +911,6 @@ function addItem() {
   const rawDate = dateInput.value;
   if (!text) {
     if (!rawDate.trim()) { input.focus(); return; }
-    // 只填了日期没填内容时给提示，避免"看起来没反应"
     previewDeadline("add");
     const box = document.getElementById("addPreview");
     box.textContent = "⚠ 请先输入待办内容"; box.className = "dl-preview warn";
@@ -735,7 +927,6 @@ function addItem() {
   saveData(); render();
 }
 
-// Edit modal
 function openEdit(idx) {
   editIdx = idx;
   document.getElementById("editText").value = items[idx].text;
@@ -768,7 +959,6 @@ function saveEdit() {
   saveData(); render();
 }
 
-// Delete modal
 function openDel(idx) {
   delIdx = idx;
   document.getElementById("delText").textContent = `删除「${items[idx].text}」？`;
@@ -785,7 +975,6 @@ function confirmDel() {
   saveData(); render();
 }
 
-// Toolbar
 function toggleSort() {
   sortByDeadline = !sortByDeadline;
   saveData(); render();
@@ -823,14 +1012,12 @@ function exportData() {
 
 function clearAll() {
   if (!confirm("清空所有数据并恢复默认？此操作不可撤销！")) return;
-  localStorage.removeItem(STORAGE_KEY);
-  LEGACY_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
   items = DEFAULT_ITEMS.map(i => ({ ...i }));
   checked = {};
+  sortByDeadline = false;
   saveData(); render();
 }
 
-// Close modals on overlay click
 document.getElementById("editModal").addEventListener("click", function(e) {
   if (e.target === this) closeEdit();
 });
@@ -838,14 +1025,19 @@ document.getElementById("delModal").addEventListener("click", function(e) {
   if (e.target === this) closeDel();
 });
 
-// Keyboard: Escape closes modals
 document.addEventListener("keydown", function(e) {
   if (e.key === "Escape") { if (CAL.open) { closePicker(); return; } closeEdit(); closeDel(); }
   if (e.key === "Enter" && editIdx >= 0 && e.target.tagName !== "TEXTAREA") { saveEdit(); }
 });
 
+/* ============================================================
+   启动：先抓取「干净的」页面模板（用于写回文件时重建 HTML），
+   再加载数据、渲染、尝试恢复文件绑定。
+   ============================================================ */
+const HTML_TEMPLATE = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+const JSON_RE = /<script[^>]*id="todoData"[^>]*>[\s\S]*?<\/script>/;
+
 loadData();
 render();
-</script>
-</body>
-</html>
+initFileBinding();
+</script></body></html>
