@@ -1,0 +1,144 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; padding: 20px; min-height: 100vh; overflow-y: auto; }
+.container { max-width: 860px; margin: 0 auto; padding-bottom: 40px; }
+h1 { font-size: 24px; text-align: center; margin-bottom: 8px; color: #1a1a1a; }
+.meta { text-align: center; color: #888; font-size: 13px; margin-bottom: 20px; }
+.stats { display: flex; justify-content: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.stat { background: #fff; border-radius: 8px; padding: 10px 20px; font-size: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.stat b { color: #2B579A; font-size: 20px; }
+.stat.done b { color: #2E7D32; }
+.stat.late b { color: #c62828; }
+
+.toolbar { display: flex; justify-content: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.toolbar button { background: #2B579A; color: #fff; border: none; padding: 8px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: background 0.15s; }
+.toolbar button:hover { background: #1e3f6e; }
+.toolbar button.secondary { background: #fff; color: #666; border: 1px solid #ddd; }
+.toolbar button.secondary:hover { border-color: #999; color: #333; }
+.toolbar button.secondary.active { background: #2B579A; color: #fff; border-color: #2B579A; }
+.toolbar button.danger { background: #fff; color: #c62828; border: 1px solid #e0e0e0; }
+.toolbar button.danger:hover { background: #c62828; color: #fff; border-color: #c62828; }
+
+.list { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow: hidden; }
+.item { display: flex; align-items: flex-start; padding: 12px 16px; border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
+.item:last-child { border-bottom: none; }
+.item:hover { background: #f8faff; }
+.item.checked { background: #f6fbf6; }
+
+.checkbox { width: 22px; height: 22px; border: 2px solid #ccc; border-radius: 5px; display: flex; align-items: center; justify-content: center; margin-right: 10px; margin-top: 3px; transition: all 0.15s; flex-shrink: 0; cursor: pointer; user-select: none; }
+.checkbox svg { width: 14px; height: 14px; opacity: 0; transition: opacity 0.15s; }
+.item.checked .checkbox { border-color: #2E7D32; background: #2E7D32; }
+.item.checked .checkbox svg { opacity: 1; }
+
+.no { width: 28px; font-size: 13px; color: #999; font-weight: 600; flex-shrink: 0; text-align: right; margin-right: 10px; margin-top: 3px; }
+.body { flex: 1; min-width: 0; }
+.line1 { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 0; }
+.content { font-size: 15px; line-height: 1.5; word-break: break-all; }
+.item.checked .content { text-decoration: line-through; color: #999; }
+.note { font-size: 12px; color: #888; margin-left: 6px; }
+.note.check { color: #2E7D32; font-weight: 600; }
+.note.cross { color: #c62828; }
+
+.metaRow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.badge { font-size: 12px; line-height: 18px; padding: 1px 8px; border-radius: 10px; background: #eef2f8; color: #556070; display: inline-flex; align-items: center; gap: 4px; border: 1px solid transparent; }
+.badge.owner { background: #e8f0fe; color: #2B579A; }
+.badge.deadline { background: #f1f3f5; color: #555; }
+.badge.deadline.today { background: #fff4e0; color: #b26a00; font-weight: 600; }
+.badge.deadline.soon { background: #e9f7ef; color: #1b7a3d; }
+.badge.deadline.overdue { background: #fce8e6; color: #c62828; font-weight: 600; }
+.badge.deadline.unparsed { background: #fff; color: #888; border: 1px dashed #d0d0d0; }
+.item.checked .badge { opacity: .55; }
+
+.actions { display: flex; gap: 4px; margin-left: 8px; flex-shrink: 0; opacity: 0; transition: opacity 0.15s; }
+.item:hover .actions { opacity: 1; }
+.act-btn { width: 28px; height: 28px; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: background 0.15s; }
+.act-btn.edit { background: #e8f0fe; color: #2B579A; }
+.act-btn.edit:hover { background: #2B579A; color: #fff; }
+.act-btn.del { background: #fce8e6; color: #c62828; }
+.act-btn.del:hover { background: #c62828; color: #fff; }
+
+/* Modal */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.3); z-index: 100; display: none; align-items: center; justify-content: center; }
+.modal-overlay.show { display: flex; }
+.modal { background: #fff; border-radius: 12px; padding: 24px; width: 90%; max-width: 480px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); max-height: 90vh; overflow-y: auto; }
+.modal h3 { font-size: 18px; margin-bottom: 16px; color: #1a1a1a; }
+.modal label { display: block; font-size: 13px; color: #888; margin-bottom: 4px; margin-top: 12px; }
+.modal input, .modal textarea { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; font-size: 14px; outline: none; transition: border-color 0.15s; font-family: inherit; background: #fff; }
+.modal input:focus, .modal textarea:focus { border-color: #2B579A; }
+.modal textarea { resize: vertical; min-height: 60px; }
+.modal .row2 { display: flex; gap: 12px; }
+.modal .row2 > div { flex: 1; min-width: 0; }
+.modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.modal-btns button { padding: 8px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; border: 1px solid #ddd; background: #fff; color: #666; transition: all 0.15s; }
+.modal-btns button:hover { border-color: #999; }
+.modal-btns button.primary { background: #2B579A; color: #fff; border-color: #2B579A; }
+.modal-btns button.primary:hover { background: #1e3f6e; }
+
+/* 日期输入行 + 日历按钮 */
+.dl-wrap { position: relative; }
+.dl-wrap input { padding-right: 38px; }
+.pick-btn { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; border: none; background: #f1f3f5; border-radius: 6px; cursor: pointer; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.pick-btn:hover { background: #e8f0fe; }
+.pick-btn.on { background: #2B579A; color: #fff; }
+.dl-preview { font-size: 12px; margin-top: 5px; min-height: 16px; color: #888; line-height: 1.4; }
+.dl-preview.ok { color: #1b7a3d; }
+.dl-preview.ok.today { color: #b26a00; }
+.dl-preview.ok.overdue { color: #c62828; }
+.dl-preview.warn { color: #b26a00; }
+.clear-btn { font-size: 12px; color: #c62828; background: none; border: none; cursor: pointer; padding: 0; margin-top: 4px; text-decoration: underline; }
+/* 自建日历面板 */
+.cal-pop { position: fixed; z-index: 300; width: 268px; background: #fff; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.22); padding: 10px; font-size: 13px; }
+.cal-head { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.cal-title { flex: 1; text-align: center; font-weight: 600; font-size: 14px; color: #1a1a1a; }
+.cal-nav { width: 26px; height: 26px; border: none; background: #f1f3f5; border-radius: 6px; cursor: pointer; font-size: 14px; color: #555; }
+.cal-nav:hover { background: #e8f0fe; color: #2B579A; }
+.cal-quick { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.cal-quick button { border: 1px solid #e3e8ef; background: #fff; color: #556070; border-radius: 12px; padding: 3px 8px; font-size: 12px; cursor: pointer; }
+.cal-quick button:hover { border-color: #2B579A; color: #2B579A; }
+.cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-week span { text-align: center; font-size: 11px; color: #999; padding: 2px 0; }
+.cal-day { text-align: center; padding: 5px 0; border-radius: 6px; cursor: pointer; color: #333; border: 1px solid transparent; }
+.cal-day:hover { background: #eef2f8; }
+.cal-day.empty { cursor: default; }
+.cal-day.empty:hover { background: none; }
+.cal-day.weekend { color: #a06a6a; }
+.cal-day.today { border-color: #2B579A; color: #2B579A; font-weight: 600; }
+.cal-day.sel { background: #2B579A; color: #fff !important; font-weight: 600; }
+.cal-foot { display: flex; gap: 6px; margin-top: 8px; }
+.cal-foot button { flex: 1; border: 1px solid #e3e8ef; background: #fff; color: #666; border-radius: 6px; padding: 5px 0; font-size: 12px; cursor: pointer; }
+.cal-foot button:hover { border-color: #999; color: #333; }
+.cal-foot .cal-clear { color: #c62828; }
+
+.empty { padding: 36px 16px; text-align: center; color: #aaa; font-size: 14px; }
+
+.footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; padding: 8px; background: rgba(240,242,245,0.92); color: #aaa; font-size: 12px; z-index: 50; }
+.save-indicator { color: #2E7D32; font-weight: 600; opacity: 0; transition: opacity 0.3s; margin-right: 10px; }
+.save-indicator.show { opacity: 1; }
+
+/* 数据文件状态条 */
+.filebar { display: flex; align-items: center; gap: 10px; justify-content: center; flex-wrap: wrap; background: #fff; border-radius: 8px; padding: 8px 14px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); font-size: 13px; }
+.filebar .fb-status { color: #666; }
+.filebar .fb-status.ok { color: #2E7D32; font-weight: 600; }
+.filebar .fb-status.warn { color: #b26a00; font-weight: 600; }
+.filebar button { background: #2B579A; color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: background 0.15s; }
+.filebar button:hover { background: #1e3f6e; }
+.filebar button.ghost { background: #fff; color: #666; border: 1px solid #ddd; }
+.filebar button.ghost:hover { border-color: #999; color: #333; background: #fff; }
+
+/* 底部添加行 */
+.add-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; align-items: center; }
+.add-row input { border: 2px dashed #ccc; border-radius: 8px; padding: 10px 12px; font-size: 14px; outline: none; transition: border-color 0.15s; font-family: inherit; background: #fff; }
+.add-row input:focus { border-color: #2B579A; border-style: solid; }
+.add-row .add-text { flex: 1 1 220px; min-width: 0; }
+.add-row .add-owner { flex: 0 1 120px; }
+.add-row .add-deadline-wrap { flex: 0 1 180px; position: relative; display: flex; align-items: center; min-width: 0; }
+.add-row .add-deadline-wrap input { flex: 1; width: 100%; min-width: 0; padding-right: 36px; }
+.add-row button.add-btn { background: #2E7D32; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-size: 14px; cursor: pointer; white-space: nowrap; transition: background 0.15s; }
+.add-row button.add-btn:hover { background: #1b5e20; }
+.add-hint { flex: 1 1 100%; font-size: 12px; color: #999; margin-top: -2px; min-height: 16px; }
+
+@media (max-width: 620px) {
+  .actions { opacity: 1; }
+  .add-row .add-owner { flex: 1 1 100%; }
+  .add-row .add-deadline-wrap { flex: 1 1 100%; }
+}
