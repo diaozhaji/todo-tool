@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net46</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <RootNamespace>TodoTool</RootNamespace>
+    <AssemblyName>TodoTool</AssemblyName>
+    <Product>待办清单</Product>
+    <ApplicationIcon>App.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Release 不生成 pdb，exe 体积最小 -->
+    <DebugType Condition="'$(Configuration)'=='Release'">none</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 允许在 macOS/Linux 上交叉编译 net46 目标；
+         net46 = Win10 1507 起全系自带，兼容全部 Win10/Win11，零安装；
+         在 Windows 上若已安装 targeting pack 同样无副作用 -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>
