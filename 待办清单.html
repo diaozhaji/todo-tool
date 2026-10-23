@@ -405,8 +405,10 @@ body.dragging-active .item { transition: none; }
 
 .body { flex: 1; min-width: 0; }
 .line1 { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 0; }
-.content { font-size: 15px; line-height: 1.55; font-weight: 500; color: #1f2937; }
+.content { font-size: 15px; line-height: 1.55; font-weight: 500; color: #1f2937; cursor: pointer; }
+.content:hover { color: var(--primary); }
 .item.checked .content { color: #9aa7b4; }
+.item.checked .content:hover { color: var(--primary); }
 .note { margin-left: 8px; }
 
 .pill {
@@ -722,9 +724,11 @@ body.dragging-active .item { transition: none; }
   <button class="secondary" id="sortBtn" onclick="toggleSort()">按截止日期排序</button>
   <button class="secondary" onclick="openArchive()">归档记录<span class="count-badge" id="archiveCount">0</span></button>
   <button class="secondary" onclick="resetChecks()">重置勾选</button>
+  <button class="secondary" onclick="pickImport()">导入 TXT</button>
   <button class="secondary" onclick="exportData()">导出数据</button>
   <button class="danger" onclick="clearAll()">清空重建</button>
 </div>
+<input type="file" id="importFile" accept=".txt,text/plain" style="display:none" onchange="handleImportFile(event)">
 <div class="list" id="list"></div>
 <div class="add-row">
   <input id="addInput" class="add-text" placeholder="输入新待办项..." onkeydown="if(event.key==='Enter')addItem()">
@@ -816,7 +820,7 @@ body.dragging-active .item { transition: none; }
 </div>
 
 <!-- ===== 数据（内嵌在本文件里，文件即数据） ===== -->
-<script id="todoData" type="application/json">{"updatedAt":1790576169124,"items":[{"id":1,"text":"示例：整理接口文档，同步确认字段","note":"","owner":"张三","deadline":"2026-09-30","deadlineText":""}],"checked":{"2":true},"sortByDeadline":false}</script>
+<script id="todoData" type="application/json">{"updatedAt":1792726320767,"items":[{"id":1,"text":"示例：整理接口文档，同步确认字段","note":"","owner":"张三","deadline":"","deadlineText":"后天","createdAt":1792726310948,"progress":[],"completedAt":null,"deleted":false,"deletedAt":null},{"id":2,"text":"示例：整理接口文档，同步确认字段","note":"","owner":"张三","deadline":"2026-10-30","deadlineText":"","createdAt":1790576160000,"progress":[],"completedAt":null,"deleted":false,"deletedAt":null},{"id":3,"text":"12333333","note":"","owner":"1111","deadline":"2026-10-23","deadlineText":"","createdAt":1792725900000,"progress":[],"completedAt":null,"deleted":false,"deletedAt":null},{"id":4,"text":"你好呀","note":"","owner":"fff","deadline":"2026-10-20","deadlineText":"","createdAt":1792725900000,"progress":[],"completedAt":null,"deleted":false,"deletedAt":null},{"id":5,"text":"123","note":"","owner":"444","deadline":"2026-10-25","deadlineText":"","createdAt":1792726260000,"progress":[],"completedAt":null,"deleted":false,"deletedAt":null}],"checked":{},"sortByDeadline":false}</script>
 
 <script>
 const STORAGE_KEY = "zhika_todo_data_v2";
@@ -1500,13 +1504,14 @@ function render() {
     const div = document.createElement("div");
     div.className = "item" + (isChk ? " checked" : "") + (!isChk && hasProgress ? " in-progress" : "");
     div.dataset.id = item.id;
+    div.dataset.idx = idx;
     div.innerHTML = `
       ${dragHandle}
       <div class="checkbox" data-idx="${idx}" title="标记完成"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
       <span class="no">${order + 1}</span>
       <div class="body">
         <div class="line1">
-          <span class="content">${esc(item.text)}</span>
+          <span class="content" title="点击编辑">${esc(item.text)}</span>
           ${!isChk && hasProgress ? `<span class="pill progress">进行中</span>` : ''}
           ${isChk ? `<span class="pill done">已完成</span>` : ''}
           ${item.note ? `<span class="note ${noteClass(item.note)}">${esc(item.note)}</span>` : ''}
@@ -1540,6 +1545,13 @@ function render() {
 }
 
 document.getElementById("list").addEventListener("click", function(e) {
+  if (Date.now() < suppressClickUntil) return;
+  const content = e.target.closest(".content");
+  if (content) {
+    const row = content.closest(".item[data-idx]");
+    if (row) openEdit(+row.dataset.idx);
+    return;
+  }
   const cb = e.target.closest(".checkbox");
   if (cb) {
     const idx = +cb.dataset.idx;
@@ -1579,6 +1591,7 @@ document.getElementById("list").addEventListener("click", function(e) {
 
 /* ---------------- 拖拽排序 ---------------- */
 let dragState = null;
+let suppressClickUntil = 0;
 
 function reorderItemsByIds(ids) {
   const map = new Map(items.map(i => [i.id, i]));
@@ -1651,6 +1664,7 @@ function finishDrag() {
   window.removeEventListener("pointercancel", cancelDrag);
   document.body.classList.remove("dragging-active");
   if (!st.started) return;
+  suppressClickUntil = Date.now() + 300;
 
   const el = st.el;
   el.classList.remove("dragging");
@@ -1713,6 +1727,7 @@ function addItem() {
     createdAt: Date.now(), progress: [], completedAt: null, deleted: false, deletedAt: null
   };
   applyDeadline(it, rawDate);
+  delete checked[it.id];
   items.push(it);
   input.value = ""; ownerInput.value = ""; dateInput.value = "";
   previewDeadline("add");
@@ -1782,6 +1797,153 @@ function resetChecks() {
   saveData(); render();
 }
 
+/* ---------------- 从 TXT 导入 ---------------- */
+function pickImport() {
+  document.getElementById("importFile").click();
+}
+function splitImportFields(s) {
+  return String(s || "").split(/\s+\|\s+/).map(x => x.trim()).filter(Boolean);
+}
+function parseImportStamp(s) {
+  const m = String(s || "").match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?/);
+  if (!m) return null;
+  const d = new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0));
+  return isNaN(d.getTime()) ? null : d.getTime();
+}
+function readImportField(seg) {
+  const m = String(seg || "").match(/^([^:：]+)[:：]\s*([\s\S]*)$/);
+  if (!m) return null;
+  return { key: m[1].trim(), val: m[2].trim() };
+}
+function parseImportText(text) {
+  const out = [];
+  const lines = String(text || "").split(/\r?\n/);
+  let inDeleted = false;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (/^已删除记录/.test(line)) { inDeleted = true; continue; }
+    if (/^(共\s*\d+\s*项|导出时间|待办清单|制卡技术待办清单)/.test(line)) continue;
+
+    const segs = splitImportFields(line);
+    if (!segs.length) continue;
+    let content = "", fields = {};
+
+    if (inDeleted) {
+      content = segs.shift();
+      segs.forEach(seg => {
+        const f = readImportField(seg);
+        if (f) fields[f.key] = f.val;
+        else content += " | " + seg;
+      });
+      if (!content) continue;
+      const createdAt = parseImportStamp(fields["创建"]);
+      const deletedAt = parseImportStamp(fields["删除"]);
+      const completedAt = parseImportStamp(fields["完成"]);
+      out.push({
+        text: content,
+        owner: fields["负责人"] || "",
+        note: fields["备注"] || "",
+        createdAt: createdAt || deletedAt || Date.now(),
+        deadline: "",
+        deadlineText: fields["截止"] || "",
+        progress: fields["最新进展"] ? [{ text: fields["最新进展"], at: createdAt || Date.now() }] : [],
+        completed: !!completedAt,
+        completedAt: completedAt || null,
+        deleted: true,
+        deletedAt: deletedAt || Date.now()
+      });
+      continue;
+    }
+
+    const m = line.match(/^\d+\.\s*\[([^\]]*)\]\s*([\s\S]*)$/);
+    if (!m) continue;
+    const isDone = /[✓√xX]/.test(m[1]);
+    const parts = splitImportFields(m[2]);
+    if (!parts.length) continue;
+    content = parts.shift();
+    parts.forEach(seg => {
+      const f = readImportField(seg);
+      if (f) fields[f.key] = f.val;
+      else content += " | " + seg;
+    });
+    if (!content) continue;
+
+    const createdAt = parseImportStamp(fields["创建"]);
+    const completedAt = parseImportStamp(fields["完成"]);
+    let deadline = "", deadlineText = "";
+    const rawDl = (fields["截止"] || "").replace(/[（(]已逾期[^）)]*[）)]/g, "").trim();
+    if (rawDl) {
+      const isoLike = rawDl.match(/^\d{4}\s*[-\/.]\s*\d{1,2}\s*[-\/.]\s*\d{1,2}/);
+      const iso = parseDeadline(isoLike ? isoLike[0] : rawDl);
+      if (iso) deadline = iso;
+      else deadlineText = rawDl;
+    }
+
+    out.push({
+      text: content,
+      owner: fields["负责人"] || "",
+      note: fields["备注"] || "",
+      createdAt: createdAt || Date.now(),
+      deadline, deadlineText,
+      progress: fields["最新进展"] ? [{ text: fields["最新进展"], at: createdAt || Date.now() }] : [],
+      completed: isDone || !!completedAt,
+      completedAt: completedAt || (isDone ? Date.now() : null),
+      deleted: false,
+      deletedAt: null
+    });
+  }
+  return out;
+}
+function importParsedItems(list) {
+  let nextId = items.reduce((m, i) => Math.max(m, i.id), 0) + 1;
+  const now = Date.now();
+  list.forEach(p => {
+    const id = nextId++;
+    const done = !!p.completed;
+    if (done) checked[id] = true;
+    else delete checked[id];
+    items.push({
+      id,
+      text: p.text,
+      note: p.note || "",
+      owner: p.owner || "",
+      deadline: p.deadline || "",
+      deadlineText: p.deadlineText || "",
+      createdAt: p.createdAt || now,
+      progress: Array.isArray(p.progress) ? p.progress : [],
+      completedAt: done ? (p.completedAt || now) : null,
+      deleted: !!p.deleted,
+      deletedAt: p.deleted ? (p.deletedAt || now) : null
+    });
+  });
+}
+async function handleImportFile(e) {
+  const input = e.target;
+  const file = input.files && input.files[0];
+  input.value = "";
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const parsed = parseImportText(text);
+    if (!parsed.length) {
+      alert("未能从该文件中识别到待办项。\n请选择由本工具导出的 TXT 文件。");
+      return;
+    }
+    const doneCount = parsed.filter(p => p.completed && !p.deleted).length;
+    const deletedCount = parsed.filter(p => p.deleted).length;
+    const ok = confirm(`从「${file.name}」识别到 ${parsed.length} 项（已完成 ${doneCount} 项，已删除 ${deletedCount} 项）。\n\n导入的内容将追加到当前清单，是否继续？`);
+    if (!ok) return;
+    importParsedItems(parsed);
+    saveData(); render();
+    alert(`导入完成：新增 ${parsed.length} 项。`);
+  } catch (err) {
+    console.error(err);
+    alert("导入失败：" + (err && err.message ? err.message : err));
+  }
+}
+
 function exportData() {
   const lines = visibleRows().map(({ item }, i) => {
     const chk = checked[item.id] ? "✓" : " ";
@@ -1805,14 +1967,19 @@ function exportData() {
   const deletedLines = items.filter(i => i.deleted).sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0)).map(item => {
     const parts = [`${item.text}`, `创建: ${fmtTimeFull(item.createdAt)}`, `删除: ${fmtTimeFull(item.deletedAt)}`];
     if (item.owner) parts.push(`负责人: ${item.owner}`);
+    if (item.progress && item.progress.length) parts.push(`最新进展: ${item.progress[item.progress.length - 1].text}`);
+    if (item.completedAt) parts.push(`完成: ${fmtTimeFull(item.completedAt)}`);
+    if (item.note) parts.push(`备注: ${item.note}`);
     return parts.join("  |  ");
   });
-  const head = `制卡技术待办清单  导出时间：${new Date().toLocaleString("zh-CN")}\n共 ${lines.length} 项\n\n`;
+  const head = `待办清单  导出时间：${new Date().toLocaleString("zh-CN")}\n共 ${lines.length} 项\n\n`;
   const tail = deletedLines.length ? `\n\n已删除记录（${deletedLines.length} 项）\n` + deletedLines.join("\n") : "";
   const blob = new Blob([head + lines.join("\n") + tail], { type: "text/plain;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "制卡技术待办清单.txt";
+  const now = new Date();
+  const dateStr = now.getFullYear() + pad2(now.getMonth() + 1) + pad2(now.getDate());
+  a.download = `待办清单_${dateStr}.txt`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
