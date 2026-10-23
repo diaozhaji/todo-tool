@@ -440,6 +440,30 @@ body.dragging-active .item { transition: none; }
   transition: background .15s, border-color .15s;
 }
 .progress-row:hover { background: #ffefd3; border-color: #ebcd94; }
+.progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 5px 9px;
+  border-radius: 9px;
+  background: var(--warning-soft);
+  border: 1px solid #f4e0bb;
+}
+.progress-list .progress-row {
+  margin: 0 -4px;
+  padding: 3px 4px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+}
+.progress-list .progress-row:hover { background: rgba(245, 158, 11, .13); border: none; }
+.progress-list .progress-row + .progress-row {
+  border-top: 1px dashed #efd8ae;
+  border-radius: 0 0 5px 5px;
+  margin-top: 1px;
+  padding-top: 5px;
+}
 .progress-dot {
   width: 6px;
   height: 6px;
@@ -457,6 +481,32 @@ body.dragging-active .item { transition: none; }
   white-space: nowrap;
 }
 .progress-time { flex-shrink: 0; color: #a16207; font-size: 11.5px; }
+.progress-check {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #dfae55;
+  border-radius: 4px;
+  background: #fff;
+  color: #fff;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.progress-check svg { width: 10px; height: 10px; opacity: 0; transition: opacity .15s; }
+.progress-check:hover { border-color: var(--success); }
+.progress-check.on { background: var(--success); border-color: var(--success); }
+.progress-check.on svg { opacity: 1; }
+.progress-text.done {
+  text-decoration: line-through;
+  color: #9aa7b4;
+  font-weight: 500;
+}
+.ph-entry .progress-check { margin-top: 3px; }
+.ph-text.done { text-decoration: line-through; color: #9aa7b4; }
 
 .metaRow { gap: 6px; margin-top: 7px; }
 .badge { font-size: 11.5px; line-height: 18px; padding: 2px 8px; border-radius: 99px; }
@@ -722,7 +772,7 @@ body.dragging-active .item { transition: none; }
 </div>
 <div class="toolbar">
   <button class="secondary" id="sortBtn" onclick="toggleSort()">按截止日期排序</button>
-  <button class="secondary" onclick="openArchive()">归档记录<span class="count-badge" id="archiveCount">0</span></button>
+  <button class="secondary" onclick="openArchive()" title="查看已删除和已完成记录">已删除<span class="count-badge" id="archiveCount">0</span></button>
   <button class="secondary" onclick="resetChecks()">重置勾选</button>
   <button class="secondary" onclick="pickImport()">导入 TXT</button>
   <button class="secondary" onclick="exportData()">导出数据</button>
@@ -807,7 +857,7 @@ body.dragging-active .item { transition: none; }
 <!-- Archive Modal -->
 <div class="modal-overlay" id="archiveModal">
 <div class="modal archive-modal">
-  <h3>归档记录</h3>
+  <h3>已删除 / 已完成</h3>
   <div class="tabs">
     <button class="tab active" data-tab="deleted" onclick="setArchiveTab('deleted')">已删除 <span id="deletedCount">0</span></button>
     <button class="tab" data-tab="completed" onclick="setArchiveTab('completed')">已完成 <span id="completedCount">0</span></button>
@@ -820,7 +870,7 @@ body.dragging-active .item { transition: none; }
 </div>
 
 <!-- ===== 数据（内嵌在本文件里，文件即数据） ===== -->
-<script id="todoData" type="application/json">{"updatedAt":1792726320767,"items":[{"id":1,"text":"示例：整理接口文档，同步确认字段","note":"","owner":"张三","deadline":"","deadlineText":"后天","createdAt":1792726310948,"progress":[],"completedAt":null,"deleted":false,"deletedAt":null},{"id":2,"text":"示例：整理接口文档，同步确认字段","note":"","owner":"张三","deadline":"2026-10-30","deadlineText":"","createdAt":1790576160000,"progress":[],"completedAt":null,"deleted":false,"deletedAt":null},{"id":3,"text":"12333333","note":"","owner":"1111","deadline":"2026-10-23","deadlineText":"","createdAt":1792725900000,"progress":[],"completedAt":null,"deleted":false,"deletedAt":null},{"id":4,"text":"你好呀","note":"","owner":"fff","deadline":"2026-10-20","deadlineText":"","createdAt":1792725900000,"progress":[],"completedAt":null,"deleted":false,"deletedAt":null},{"id":5,"text":"123","note":"","owner":"444","deadline":"2026-10-25","deadlineText":"","createdAt":1792726260000,"progress":[],"completedAt":null,"deleted":false,"deletedAt":null}],"checked":{},"sortByDeadline":false}</script>
+<script id="todoData" type="application/json">{"updatedAt":1792740861069,"items":[{"id":3,"text":"12333333","note":"","owner":"1111","deadline":"2026-10-23","deadlineText":"","createdAt":1792725900000,"progress":[],"completedAt":1792734721766,"deleted":false,"deletedAt":null},{"id":5,"text":"123","note":"","owner":"444","deadline":"2026-10-25","deadlineText":"","createdAt":1792726260000,"progress":[],"completedAt":null,"deleted":false,"deletedAt":null},{"id":4,"text":"你好呀","note":"","owner":"fff","deadline":"2026-10-20","deadlineText":"","createdAt":1792725900000,"progress":[{"text":"1234","at":1792734725454,"done":false},{"text":"333","at":1792734727468,"done":false},{"text":"4444","at":1792734728540,"done":false},{"text":"5555","at":1792734729551,"done":false}],"completedAt":null,"deleted":false,"deletedAt":null},{"id":1,"text":"示例：整理接口文档，同步确认字段","note":"","owner":"张三","deadline":"2026-10-25","deadlineText":"","createdAt":1792726310948,"progress":[],"completedAt":1792734718066,"deleted":true,"deletedAt":1792734738819},{"id":2,"text":"示例：整理接口文档，同步确认字段","note":"","owner":"张三","deadline":"2026-10-30","deadlineText":"","createdAt":1790576160000,"progress":[],"completedAt":1792734718390,"deleted":true,"deletedAt":1792734740034}],"checked":{"1":true,"2":true,"3":true},"sortByDeadline":false}</script>
 
 <script>
 const STORAGE_KEY = "zhika_todo_data_v2";
@@ -894,7 +944,7 @@ function loadData() {
     if (Array.isArray(i.progress)) {
       i.progress = i.progress
         .filter(p => p && typeof p.text === "string" && p.text.trim())
-        .map(p => ({ text: p.text, at: typeof p.at === "number" ? p.at : fallbackTs }));
+        .map(p => ({ text: p.text, at: typeof p.at === "number" ? p.at : fallbackTs, done: !!p.done }));
     } else if (typeof i.progress === "string" && i.progress.trim()) {
       i.progress = [{ text: i.progress.trim(), at: fallbackTs }];
     } else {
@@ -1485,7 +1535,6 @@ function render() {
 
     const progress = Array.isArray(item.progress) ? item.progress : [];
     const hasProgress = progress.length > 0;
-    const latest = hasProgress ? progress[progress.length - 1] : null;
     if (!isChk && hasProgress) doingCount++;
 
     const metaBadges = [];
@@ -1516,7 +1565,14 @@ function render() {
           ${isChk ? `<span class="pill done">已完成</span>` : ''}
           ${item.note ? `<span class="note ${noteClass(item.note)}">${esc(item.note)}</span>` : ''}
         </div>
-        ${latest ? `<div class="progress-row" data-idx="${idx}" title="查看或添加进展"><span class="progress-dot"></span><span class="progress-text">${esc(latest.text)}</span><span class="progress-time">${esc(fmtTime(latest.at))}${progress.length > 1 ? " · 共 " + progress.length + " 条" : ""}</span></div>` : ''}
+        ${hasProgress ? `<div class="progress-list">${progress.map((p, i) => ({ ...p, i })).reverse().map(p => `
+          <div class="progress-row" data-idx="${idx}" title="查看或添加进展">
+            <button class="progress-check ${p.done ? "on" : ""}" data-idx="${idx}" data-pi="${p.i}" title="标记这条进展完成">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+            <span class="progress-text ${p.done ? "done" : ""}">${esc(p.text)}</span>
+            <span class="progress-time">${esc(fmtTime(p.at))}</span>
+          </div>`).join("")}</div>` : ''}
         ${metaBadges.length ? `<div class="metaRow">${metaBadges.join("")}</div>` : ''}
       </div>
       <div class="actions">
@@ -1529,7 +1585,6 @@ function render() {
   });
   const active = items.filter(i => !i.deleted);
   const deletedCount = items.filter(i => i.deleted).length;
-  const completedCount = active.filter(i => checked[i.id]).length;
   const pct = active.length ? Math.round((doneCount / active.length) * 100) : 0;
   document.getElementById("total").textContent = active.length;
   document.getElementById("doing").textContent = doingCount;
@@ -1537,7 +1592,7 @@ function render() {
   document.getElementById("late").textContent = lateCount;
   document.getElementById("progressFill").style.width = pct + "%";
   document.getElementById("donePct").textContent = pct + "%";
-  document.getElementById("archiveCount").textContent = deletedCount + completedCount;
+  document.getElementById("archiveCount").textContent = deletedCount;
   renderMeta();
   const sortBtn = document.getElementById("sortBtn");
   sortBtn.classList.toggle("active", sortByDeadline);
@@ -1565,6 +1620,17 @@ document.getElementById("list").addEventListener("click", function(e) {
       item.completedAt = Date.now();
     }
     saveData(); render();
+    return;
+  }
+  const pCheck = e.target.closest(".progress-check");
+  if (pCheck) {
+    const idx = +pCheck.dataset.idx;
+    const pi = +pCheck.dataset.pi;
+    const p = items[idx] && items[idx].progress[pi];
+    if (p) {
+      p.done = !p.done;
+      saveData(); render();
+    }
     return;
   }
   const progressBtn = e.target.closest(".act-btn.progress");
@@ -1848,7 +1914,7 @@ function parseImportText(text) {
         createdAt: createdAt || deletedAt || Date.now(),
         deadline: "",
         deadlineText: fields["截止"] || "",
-        progress: fields["最新进展"] ? [{ text: fields["最新进展"], at: createdAt || Date.now() }] : [],
+        progress: fields["最新进展"] ? [{ text: fields["最新进展"], at: createdAt || Date.now(), done: false }] : [],
         completed: !!completedAt,
         completedAt: completedAt || null,
         deleted: true,
@@ -1887,7 +1953,7 @@ function parseImportText(text) {
       note: fields["备注"] || "",
       createdAt: createdAt || Date.now(),
       deadline, deadlineText,
-      progress: fields["最新进展"] ? [{ text: fields["最新进展"], at: createdAt || Date.now() }] : [],
+      progress: fields["最新进展"] ? [{ text: fields["最新进展"], at: createdAt || Date.now(), done: false }] : [],
       completed: isDone || !!completedAt,
       completedAt: completedAt || (isDone ? Date.now() : null),
       deleted: false,
@@ -2021,9 +2087,11 @@ function renderProgressHistory() {
   }
   box.innerHTML = list.map(p => `
     <div class="ph-entry">
-      <div class="ph-dot"></div>
+      <button class="progress-check ${p.done ? "on" : ""}" data-i="${p.i}" title="标记这条进展完成">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
       <div class="ph-body">
-        <div class="ph-text">${esc(p.text)}</div>
+        <div class="ph-text ${p.done ? "done" : ""}">${esc(p.text)}</div>
         <div class="ph-time">${esc(fmtTimeFull(p.at))}</div>
       </div>
       <button class="ph-del" data-i="${p.i}" title="删除这条进展">✕</button>
@@ -2035,14 +2103,24 @@ function saveProgress() {
   const input = document.getElementById("progressInput");
   const text = input.value.trim();
   if (!text) { input.focus(); return; }
-  items[progressIdx].progress.push({ text, at: Date.now() });
+  items[progressIdx].progress.push({ text, at: Date.now(), done: false });
   input.value = "";
   saveData(); render(); renderProgressHistory();
   input.focus();
 }
 document.getElementById("progressHistory").addEventListener("click", function (e) {
+  if (progressIdx < 0) return;
+  const check = e.target.closest(".progress-check");
+  if (check) {
+    const p = items[progressIdx].progress[+check.dataset.i];
+    if (p) {
+      p.done = !p.done;
+      saveData(); render(); renderProgressHistory();
+    }
+    return;
+  }
   const btn = e.target.closest(".ph-del");
-  if (!btn || progressIdx < 0) return;
+  if (!btn) return;
   if (!confirm("删除这条进展记录？")) return;
   items[progressIdx].progress.splice(+btn.dataset.i, 1);
   saveData(); render(); renderProgressHistory();
@@ -2050,6 +2128,7 @@ document.getElementById("progressHistory").addEventListener("click", function (e
 
 /* ---------------- 归档记录 ---------------- */
 function openArchive() {
+  archiveTab = "deleted";
   document.getElementById("archiveModal").classList.add("show");
   renderArchive();
 }
